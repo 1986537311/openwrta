@@ -33,7 +33,7 @@ jobs:
           git clean -df
 
       - name: 写入插件源配置
-        run: >
+        run: |
           cat > feeds.conf.default <<'FEEDS'
           src-git packages https://github.com/openwrt/packages.git;openwrt-25.12
           src-git luci https://github.com/openwrt/luci.git;openwrt-25.12
@@ -47,7 +47,7 @@ jobs:
           FEEDS
 
       - name: 写入完整分组固件配置
-        run: >
+        run: |
           cat > .config <<'CONFIG'
           #====================基础架构与分区设置====================
           CONFIG_TARGET_x86=y
