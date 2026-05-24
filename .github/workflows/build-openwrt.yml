@@ -1,0 +1,245 @@
+name: Build OpenWrt x86_64 8GEXT4全插件固件
+on:
+  workflow_dispatch:
+    inputs:
+      runnow:
+        description: 直接运行编译最新固件
+        required: false
+  schedule:
+    - cron: '0 2 1 * *'
+  push:
+    branches: [ 25.12 ]
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: 固定拉取25.12分支
+        uses: actions/checkout@v4
+        with:
+          ref: 25.12
+          fetch-depth: 0
+
+      - name: 安装编译依赖
+        run: |
+          sudo apt update
+          sudo apt install -y build-essential flex bison gawk python3 python3-pip unzip libssl-dev libncurses5-dev git wget curl file
+
+      - name: 同步Lienol最新源码
+        run: |
+          git remote add upstream https://github.com/Lienol/openwrt.git || true
+          git fetch upstream 25.12
+          git reset --hard upstream/25.12
+          git clean -df
+
+      - name: 写入插件源配置
+        run: >
+          cat > feeds.conf.default <<'FEEDS'
+          src-git packages https://github.com/openwrt/packages.git;openwrt-25.12
+          src-git luci https://github.com/openwrt/luci.git;openwrt-25.12
+          src-git routing https://github.com/openwrt/routing.git;openwrt-25.12
+          src-git telephony https://github.com/openwrt/telephony.git;openwrt-25.12
+          src-git lienol https://github.com/Lienol/openwrt-package.git
+          src-git istore https://github.com/linkease/istore.git
+          src-git phonebackup https://github.com/linkease/istore-packages.git
+          src-git passwall_packages https://github.com/OpenWrt-Passwall/openwrt-passwall-packages.git
+          src-git passwall_luci https://github.com/OpenWrt-Passwall/openwrt-passwall.git
+          FEEDS
+
+      - name: 写入完整分组固件配置
+        run: >
+          cat > .config <<'CONFIG'
+          #====================基础架构与分区设置====================
+          CONFIG_TARGET_x86=y
+          CONFIG_TARGET_x86_64=y
+          CONFIG_TARGET_x86_64_DEVICE_generic=y
+          CONFIG_GRUB_IMAGES=y
+          CONFIG_GRUB_EFI_IMAGES=y
+          CONFIG_GRUB_EFI_SECUREBOOT=y
+          CONFIG_TARGET_IMAGES_GZIP=y
+          CONFIG_PACKAGE_efiboot=y
+          CONFIG_PACKAGE_grub2-efi=y
+
+          CONFIG_TARGET_ROOTFS_PARTSIZE=8192
+          CONFIG_TARGET_ROOTFS_EXT4FS=y
+          CONFIG_TARGET_ROOTFS_SQUASHFS=n
+          CONFIG_TARGET_ROOTFS_TARGZ=n
+
+          #====================LuCI基础界面====================
+          CONFIG_PACKAGE_luci=y
+          CONFIG_PACKAGE_luci-base=y
+          CONFIG_PACKAGE_luci-lib-base=y
+          CONFIG_PACKAGE_luci-lib-ipkg=y
+          CONFIG_PACKAGE_luci-lib-jsonc=y
+          CONFIG_PACKAGE_luci-lib-nixio=y
+          CONFIG_PACKAGE_luci-mod-admin-full=y
+          CONFIG_PACKAGE_luci-mod-network=y
+          CONFIG_PACKAGE_luci-mod-status=y
+          CONFIG_PACKAGE_luci-mod-system=y
+          CONFIG_PACKAGE_luci-theme-bootstrap=y
+
+          #====================系统基础工具====================
+          CONFIG_PACKAGE_luci-app-firewall=y
+          CONFIG_PACKAGE_luci-app-opkg=y
+          CONFIG_PACKAGE_luci-app-network=y
+          CONFIG_PACKAGE_luci-app-system=y
+          CONFIG_PACKAGE_luci-app-upnp=y
+          CONFIG_PACKAGE_luci-app-autoreboot=y
+          CONFIG_PACKAGE_luci-app-cpufreq=y
+
+          #====================多拨网络加速====================
+          CONFIG_PACKAGE_luci-app-mwan3=y
+          CONFIG_PACKAGE_mwan3=y
+          CONFIG_PACKAGE_luci-app-turboacc=y
+          CONFIG_PACKAGE_turboacc=y
+          CONFIG_PACKAGE_luci-app-sqm=y
+          CONFIG_PACKAGE_sqm-scripts=y
+
+          #====================DNS广告过滤====================
+          CONFIG_PACKAGE_luci-app-adguardhome=y
+          CONFIG_PACKAGE_adguardhome=y
+          CONFIG_PACKAGE_luci-app-smartdns=y
+          CONFIG_PACKAGE_smartdns=y
+          CONFIG_PACKAGE_dnsmasq-full=y
+
+          #====================插件应用商店====================
+          CONFIG_PACKAGE_luci-app-store=y
+          CONFIG_PACKAGE_istore=y
+          CONFIG_PACKAGE_luci-lib-store=y
+
+          #====================Docker容器全家桶====================
+          CONFIG_PACKAGE_luci-app-dockerman=y
+          CONFIG_PACKAGE_docker=y
+          CONFIG_PACKAGE_dockerd=y
+          CONFIG_PACKAGE_docker-compose=y
+          CONFIG_PACKAGE_dockerd-cgroup=y
+          CONFIG_PACKAGE_luci-app-dockerfile=y
+          CONFIG_PACKAGE_luci-app-dockerbackup=y
+
+          #====================存储共享备份====================
+          CONFIG_PACKAGE_luci-app-samba4=y
+          CONFIG_PACKAGE_samba4-server=y
+          CONFIG_PACKAGE_luci-app-rsync=y
+          CONFIG_PACKAGE_rsync=y
+          CONFIG_PACKAGE_luci-app-syncthing=y
+          CONFIG_PACKAGE_syncthing=y
+          CONFIG_PACKAGE_luci-app-nextcloud=y
+          CONFIG_PACKAGE_nextcloud=y
+          CONFIG_PACKAGE_luci-app-aria2=y
+          CONFIG_PACKAGE_aria2=y
+          CONFIG_PACKAGE_luci-app-autobackup=y
+          CONFIG_PACKAGE_autobackup=y
+
+          #====================全系网卡驱动====================
+          CONFIG_PACKAGE_kmod-igb=y
+          CONFIG_PACKAGE_kmod-ixgbe=y
+          CONFIG_PACKAGE_kmod-e1000=y
+          CONFIG_PACKAGE_kmod-e1000e=y
+          CONFIG_PACKAGE_kmod-r8169=y
+          CONFIG_PACKAGE_kmod-r8125=y
+          CONFIG_PACKAGE_kmod-8139cp=y
+          CONFIG_PACKAGE_kmod-8139too=y
+
+          #====================多格式磁盘文件系统====================
+          CONFIG_PACKAGE_kmod-ata-core=y
+          CONFIG_PACKAGE_kmod-ata-ahci=y
+          CONFIG_PACKAGE_kmod-fs-ext4=y
+          CONFIG_PACKAGE_kmod-fs-vfat=y
+          CONFIG_PACKAGE_kmod-fs-ntfs=y
+          CONFIG_PACKAGE_kmod-fs-exfat=y
+          CONFIG_PACKAGE_block-mount=y
+          CONFIG_PACKAGE_ntfs-3g=y
+          CONFIG_PACKAGE_exfat-fs=y
+
+          #====================USB设备支持====================
+          CONFIG_PACKAGE_kmod-usb-storage=y
+          CONFIG_PACKAGE_kmod-usb2=y
+          CONFIG_PACKAGE_kmod-usb3=y
+
+          #====================系统命令工具====================
+          CONFIG_PACKAGE_curl=y
+          CONFIG_PACKAGE_wget=y
+          CONFIG_PACKAGE_nano=y
+          CONFIG_PACKAGE_tmux=y
+          CONFIG_PACKAGE_net-tools=y
+          CONFIG_PACKAGE_iperf3=y
+          CONFIG_PACKAGE_tcpdump=y
+          CONFIG_PACKAGE_tcpdump-util=y
+          CONFIG_PACKAGE_openssl1=y
+          CONFIG_PACKAGE_unzip=y
+          CONFIG_PACKAGE_tar=y
+          CONFIG_PACKAGE_python3=y
+          CONFIG_PACKAGE_python3-pip=y
+
+          #====================分区性能优化====================
+          CONFIG_FS_CGROUP=y
+          CONFIG_FS_TMPFS_POSIX_ACL=y
+          CONFIG_PACKAGE_f2fs-tools=y
+          CONFIG_PACKAGE_fsck.f2fs=y
+          CONFIG_PACKAGE_resize2fs=y
+
+          #====================游戏多开防封插件====================
+          #多线分流辅助
+          CONFIG_PACKAGE_luci-app-mwan3helper=y
+          CONFIG_PACKAGE_mwan3helper=y
+          CONFIG_PACKAGE_luci-app-socat=y
+          CONFIG_PACKAGE_socat=y
+          CONFIG_PACKAGE_luci-app-flowoffload=y
+          CONFIG_PACKAGE_flowoffload=y
+          #NAT网络伪装
+          CONFIG_PACKAGE_iptables-mod-ipopt=y
+          CONFIG_PACKAGE_iptables-mod-conntrack-extra=y
+          CONFIG_PACKAGE_iptables-mod-tproxy=y
+          CONFIG_PACKAGE_ipset=y
+          CONFIG_PACKAGE_luci-app-nftables=y
+          CONFIG_PACKAGE_nftables=y
+          #虚拟网卡网桥
+          CONFIG_PACKAGE_kmod-tun=y
+          CONFIG_PACKAGE_kmod-veth=y
+          CONFIG_PACKAGE_kmod-bridge=y
+          CONFIG_PACKAGE_bridge-utils=y
+          CONFIG_PACKAGE_tc=y
+          CONFIG_PACKAGE_iproute2=y
+          CONFIG_PACKAGE_kmod-iptunnel=y
+          CONFIG_PACKAGE_kmod-ipip=y
+          CONFIG_PACKAGE_kmod-gre=y
+          #代理IP切换
+          CONFIG_PACKAGE_luci-app-passwall=y
+          CONFIG_PACKAGE_passwall=y
+          CONFIG_PACKAGE_luci-app-passwall2=y
+          CONFIG_PACKAGE_passwall2=y
+          CONFIG_PACKAGE_luci-app-v2raya=y
+          CONFIG_PACKAGE_v2raya=y
+          CONFIG_PACKAGE_luci-app-ssr-plus=y
+          CONFIG_PACKAGE_ssr-plus=y
+          #容器隔离增强
+          CONFIG_PACKAGE_luci-app-k3s=y
+          CONFIG_PACKAGE_k3s=y
+          #网络特征隐藏
+          CONFIG_PACKAGE_luci-app-traffic-control=y
+          CONFIG_PACKAGE_traffic-control=y
+          CONFIG_PACKAGE_kmod-tcp-cc-bbr=y
+          CONFIG_PACKAGE_tc-mod-iptables=y
+          CONFIG_PACKAGE_kmod-netfilter-xt-conntrack=y
+          CONFIG_PACKAGE_kmod-netfilter-xt-state=y
+          CONFIG
+
+      - name: 更新安装全部插件
+        run: |
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+
+      - name: 配置校验与下载源码
+        run: |
+          make defconfig
+          make download -j$(nproc)
+
+      - name: 正式编译固件
+        run: |
+          make -j$(nproc)
+
+      - name: 打包上传成品
+        uses: actions/upload-artifact@v4
+        with:
+          name: x86_64-8G-EXT4-全插件固件
+          path: bin/targets/x86/64/openwrt-x86-64-generic-ext4-combined.img.gz
