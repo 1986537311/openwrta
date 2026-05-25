@@ -5,11 +5,11 @@ on:
     - cron: '0 2 1 * *'  # 每月1号凌晨2点自动编译更新
   push:
     branches:
-      - '*'  # 所有分支都触发（或者改成你的实际分支名，比如master）
+      - '*'
 
 env:
   REPO_OWNER: 1986537311
-  REPO_NAME: openwrt
+  REPO_NAME: openwrta  # 注意：你的仓库名是 openwrta，不是 openwrt！
   TARGET: x86
   SUBTARGET: 64
   IMAGE_NAME: openwrt-x86_64-combined-squashfs
@@ -33,6 +33,8 @@ jobs:
 
       - name: Add third-party feeds
         run: |
+          # 必须先进入源码目录
+          cd $GITHUB_WORKSPACE
           cat >> feeds.conf.default << 'EOF'
           src-git helloworld https://github.com/fw876/helloworld.git;main
           src-git passwall https://github.com/xiaorouji/openwrt-passwall.git;main
@@ -48,6 +50,7 @@ jobs:
 
       - name: Generate .config (x86 64 + 全家桶完整配置)
         run: |
+          cd $GITHUB_WORKSPACE
           cat > .config << 'EOF'
           # 基础系统配置
           CONFIG_TARGET_x86=y
@@ -172,6 +175,7 @@ jobs:
 
       - name: Customize system configuration
         run: |
+          cd $GITHUB_WORKSPACE
           # 修改默认IP为192.168.1.1
           sed -i 's/192.168.1.1/192.168.1.1/g' package/base-files/files/bin/config_generate
           # 开启SSH默认登录
@@ -186,6 +190,7 @@ jobs:
 
       - name: Compile firmware
         run: |
+          cd $GITHUB_WORKSPACE
           make -j$(nproc) V=s
 
       - name: Upload firmware artifacts
