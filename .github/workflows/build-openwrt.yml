@@ -5,13 +5,11 @@ on:
     - cron: '0 2 1 * *'  # 每月1号凌晨2点自动编译更新
   push:
     branches:
-      - 25.12
+      - '*'  # 所有分支都触发（或者改成你的实际分支名，比如master）
 
 env:
   REPO_OWNER: 1986537311
   REPO_NAME: openwrt
-  REPO_BRANCH: 25.12
-  CONFIG_FILE: .config
   TARGET: x86
   SUBTARGET: 64
   IMAGE_NAME: openwrt-x86_64-combined-squashfs
@@ -24,7 +22,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: ${{ env.REPO_OWNER }}/${{ env.REPO_NAME }}
-          ref: ${{ env.REPO_BRANCH }}
           fetch-depth: 0
 
       - name: Install dependencies
@@ -51,7 +48,7 @@ jobs:
 
       - name: Generate .config (x86 64 + 全家桶完整配置)
         run: |
-          cat > $CONFIG_FILE << 'EOF'
+          cat > .config << 'EOF'
           # 基础系统配置
           CONFIG_TARGET_x86=y
           CONFIG_TARGET_x86_64=y
