@@ -1,4 +1,4 @@
-name: OpenWrt x86_64 三大全家桶完整版固件
+name: OpenWrt x86_64 四大全家桶完整版固件
 on:
   workflow_dispatch:
     inputs:
@@ -42,19 +42,19 @@ jobs:
           restore-keys: |
             ${{ github.ref_name }}-openwrt-cache-
 
-      - name: 写入必备插件源
+      - name: 写入必备插件源（含iStore、已删除失效源）
         run: |
           echo "src-git packages https://github.com/openwrt/packages.git;openwrt-25.12" > feeds.conf.default
           echo "src-git luci https://github.com/openwrt/luci.git;openwrt-25.12" >> feeds.conf.default
           echo "src-git lienol https://github.com/Lienol/openwrt-package.git" >> feeds.conf.default
+          echo "src-git istore https://github.com/linkease/istore.git" >> feeds.conf.default
+          echo "src-git istore-packages https://github.com/linkease/istore-packages.git" >> feeds.conf.default
           echo "src-git passwall https://github.com/xiaorouji/openwrt-passwall.git" >> feeds.conf.default
           echo "src-git small https://github.com/kenzok8/small.git" >> feeds.conf.default
           echo "src-git backup https://github.com/wukongdaily/OpenBackRestore.git" >> feeds.conf.default
           echo "src-git oaf https://github.com/destan19/OpenAppFilter.git" >> feeds.conf.default
           echo "src-git gameprotect https://github.com/StressOzz/Zapret-Manager.git" >> feeds.conf.default
           echo "src-git dockerpkg https://github.com/lisaac/luci-app-dockerman.git" >> feeds.conf.default
-          echo "src-git fingerprint https://github.com/openwrt-fingerprint/random.git" >> feeds.conf.default
-          echo "src-git proxytool https://github.com/openwrt-proxy/switch.git" >> feeds.conf.default
 
       - name: 系统架构与基础界面
         run: |
@@ -76,7 +76,15 @@ jobs:
           echo "CONFIG_PACKAGE_luci-lib-ipkg=y" >> .config
           echo "CONFIG_PACKAGE_luci-theme-bootstrap=y" >> .config
 
-      - name: 游戏多开防封全家桶
+      - name: iStore应用商店全家桶
+        run: |
+          echo "CONFIG_PACKAGE_luci-app-istorex=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-store=y" >> .config
+          echo "CONFIG_PACKAGE_istore-core=y" >> .config
+          echo "CONFIG_PACKAGE_istore-feed=y" >> .config
+          echo "CONFIG_PACKAGE_istore-store=y" >> .config
+
+      - name: 游戏多开防封全家桶（已删除失效插件）
         run: |
           echo "CONFIG_PACKAGE_luci-app-oaf=y" >> .config
           echo "CONFIG_PACKAGE_appfilter=y" >> .config
@@ -88,13 +96,11 @@ jobs:
           echo "CONFIG_PACKAGE_luci-app-ipseg=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-sessionisolator=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-gameaccelerator=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-fingerprintrandom=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-devicemask=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-portforward=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-proxyswitch=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-randomdelay=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-loginrandom=y" >> .config
-          echo "CONFIG_PACKAGE-luci-app-trafficmask=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-trafficmask=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-packetrandom=y" >> .config
 
       - name: 手机备份全家桶
@@ -163,5 +169,5 @@ jobs:
       - name: 上传固件文件
         uses: actions/upload-artifact@v4.4.3
         with:
-          name: OpenWrt三大全家桶固件
+          name: OpenWrt四大全家桶固件
           path: bin/targets/x86/64/generic/*.img.gz
