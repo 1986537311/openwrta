@@ -21,9 +21,6 @@ jobs:
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
-      ##########################################################################
-      # 基础环境分组
-      ##########################################################################
       - name: 拉取源码
         uses: actions/checkout@v5
         with:
@@ -63,9 +60,6 @@ jobs:
           git reset --hard upstream/25.12
           git clean -df
 
-      ##########################################################################
-      # 【终极修复】写入全部插件源（零语法错误版）
-      ##########################################################################
       - name: 写入全部插件源
         run: |
           cat > feeds.conf.default << 'EOF'
@@ -92,9 +86,6 @@ jobs:
        src-git proxytool https://github.com/openwrt-proxy/switch.git
        EOF
 
-      ##########################################################################
-      # 固件底层架构
-      ##########################################################################
       - name: 系统架构基础配置
         run: |
           echo "CONFIG_TARGET_x86=y" >> .config
@@ -111,9 +102,6 @@ jobs:
           echo "CONFIG_BUILD_ALL_HOST_TOOLS=m" >> .config
           echo "CONFIG_BUILD_PATENTED=y" >> .config
 
-      ##########################################################################
-      # 界面系统全家桶
-      ##########################################################################
       - name: 网页界面组件
         run: |
           echo "CONFIG_PACKAGE_luci=y" >> .config
@@ -140,9 +128,6 @@ jobs:
           echo "CONFIG_PACKAGE_luci-app-tempcontrol=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-sysupgrade=y" >> .config
 
-      ##########################################################################
-      # 网络加速全家桶
-      ##########################################################################
       - name: 多拨负载均衡
         run: |
           echo "CONFIG_PACKAGE_luci-app-mwan3=y" >> .config
@@ -165,9 +150,6 @@ jobs:
           echo "CONFIG_PACKAGE_smartdns=y" >> .config
           echo "CONFIG_PACKAGE_dnsmasq-full=y" >> .config
 
-      ##########################################################################
-      # 代理科学全家桶
-      ##########################################################################
       - name: 主流代理插件合集
         run: |
           echo "CONFIG_PACKAGE_luci-app-openclash=y" >> .config
@@ -180,9 +162,6 @@ jobs:
           echo "CONFIG_PACKAGE_trojan=y" >> .config
           echo "CONFIG_PACKAGE_hysteria=y" >> .config
 
-      ##########################################################################
-      # 游戏多开防封全家桶
-      ##########################################################################
       - name: 游戏隔离伪装防封全套
         run: |
           echo "CONFIG_PACKAGE_luci-app-oaf=y" >> .config
@@ -204,9 +183,6 @@ jobs:
           echo "CONFIG_PACKAGE_luci-app-trafficmask=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-packetrandom=y" >> .config
 
-      ##########################################################################
-      # 手机备份全家桶
-      ##########################################################################
       - name: 安卓苹果全机型备份
         run: |
           echo "CONFIG_PACKAGE_luci-app-backuprestore=y" >> .config
@@ -227,9 +203,6 @@ jobs:
           echo "CONFIG_PACKAGE_luci-app-verysync=y" >> .config
           echo "CONFIG_PACKAGE_verysync=y" >> .config
 
-      ##########################################################################
-      # Docker完整全家桶
-      ##########################################################################
       - name: Docker引擎+管理+网络存储全套
         run: |
           echo "CONFIG_PACKAGE_docker=y" >> .config
@@ -265,9 +238,6 @@ jobs:
           echo "CONFIG_PACKAGE_luci-app-docker-log=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-docker-exec=y" >> .config
 
-      ##########################################################################
-      # 存储共享全家桶
-      ##########################################################################
       - name: 文件共享服务
         run: |
           echo "CONFIG_PACKAGE_luci-app-samba4=y" >> .config
@@ -279,9 +249,6 @@ jobs:
           echo "CONFIG_PACKAGE_luci-app-aria2=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-qbittorrent=y" >> .config
 
-      ##########################################################################
-      # 内网远程全家桶
-      ##########################################################################
       - name: 远程穿透监控
         run: |
           echo "CONFIG_PACKAGE_luci-app-frpc=y" >> .config
@@ -290,27 +257,18 @@ jobs:
           echo "CONFIG_PACKAGE_luci-app-wol=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-keepalived=y" >> .config
 
-      ##########################################################################
-      # 安全防护全家桶
-      ##########################################################################
       - name: 防火墙防护工具
         run: |
           echo "CONFIG_PACKAGE_luci-app-sshguard=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-bruteforce-protection=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-sguiguard=y" >> .config
 
-      ##########################################################################
-      # 域名激活全家桶
-      ##########################################################################
       - name: 动态域名与激活
         run: |
           echo "CONFIG_PACKAGE_luci-app-ddns=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-kms=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-hosts=y" >> .config
 
-      ##########################################################################
-      # 硬件驱动全家桶
-      ##########################################################################
       - name: 网卡硬盘USB驱动
         run: |
           echo "CONFIG_PACKAGE_kmod-igb=y" >> .config
@@ -324,9 +282,6 @@ jobs:
           echo "CONFIG_PACKAGE_kmod-usb-storage=y" >> .config
           echo "CONFIG_PACKAGE_kmod-usb3=y" >> .config
 
-      ##########################################################################
-      # 系统工具全家桶
-      ##########################################################################
       - name: 命令运维工具
         run: |
           echo "CONFIG_PACKAGE_curl=y" >> .config
@@ -336,9 +291,6 @@ jobs:
           echo "CONFIG_PACKAGE_unzip=y" >> .config
           echo "CONFIG_PACKAGE_python3=y" >> .config
 
-      ##########################################################################
-      # 编译执行流程
-      ##########################################################################
       - name: 更新插件索引
         run: |
           ./scripts/feeds update -a
