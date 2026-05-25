@@ -1,4 +1,5 @@
-name: OpenWrt x86_64 四大全家桶固件
+name: OpenWrt x86_64 四大家桶固件
+
 on:
   workflow_dispatch:
     inputs:
@@ -7,7 +8,7 @@ on:
         required: false
         default: false
   schedule:
-    - cron: '0 2 1 * *'
+    - cron: '0 2 1 * *'  # 每月1号凌晨2点自动编译
   push:
     branches: [25.12]
 
@@ -27,7 +28,7 @@ jobs:
       - name: 安装编译依赖
         run: |
           sudo apt update
-          sudo apt install -y build-essential flex bison gawk python3 python3-pip unzip libssl-dev libncurses5-dev git
+          sudo apt install -y build-essential flex bison gawk python3 python3-pip unzip libssl-dev libncurses-dev zlib1g-dev file wget
 
       - name: 加载编译缓存
         uses: actions/cache@v4
@@ -42,60 +43,66 @@ jobs:
           restore-keys: |
             ${{ github.ref_name }}-openwrt-cache-
 
-      - name: 写入feeds源（一次性写入，零语法错误）
+      - name: 写入 feeds 源
         run: |
           cat > feeds.conf.default << 'EOF'
-src-git packages https://github.com/openwrt/packages.git;openwrt-25.12
-src-git luci https://github.com/openwrt/luci.git;openwrt-25.12
-src-git lienol https://github.com/Lienol/openwrt-package.git
-src-git istore https://github.com/linkease/istore.git
-src-git istore-packages https://github.com/linkease/istore-packages.git
-src-git passwall https://github.com/xiaorouji/openwrt-passwall.git
-src-git small https://github.com/kenzok8/small.git
-src-git backup https://github.com/wukongdaily/OpenBackRestore.git
-src-git oaf https://github.com/destan19/OpenAppFilter.git
-src-git gameprotect https://github.com/StressOzz/Zapret-Manager.git
-src-git dockerpkg https://github.com/lisaac/luci-app-dockerman.git
-EOF
+          src-git packages https://github.com/openwrt/packages.git;openwrt-25.12
+          src-git luci https://github.com/openwrt/luci.git;openwrt-25.12
+          src-git lienol https://github.com/Lienol/openwrt-package.git
+          src-git istore https://github.com/linkease/istore.git
+          src-git istore-packages https://github.com/linkease/istore-packages.git
+          src-git passwall https://github.com/xiaorouji/openwrt-passwall.git
+          src-git small https://github.com/kenzok8/small.git
+          src-git backup https://github.com/wukongdaily/OpenBackRestore.git
+          src-git oaf https://github.com/destan19/OpenAppFilter.git
+          src-git gameprotect https://github.com/StressOzz/Zapret-Manager.git
+          src-git dockerpkg https://github.com/lisaac/luci-app-dockerman.git
+          EOF
 
       - name: 系统架构与基础界面
         run: |
           echo "CONFIG_TARGET_x86=y" >> .config
           echo "CONFIG_TARGET_x86_64=y" >> .config
-          echo "CONFIG_TARGET_x86_64_DEVICE_generic=y" >> .config
-          echo "CONFIG_GRUB_IMAGES=y" >> .config
-          echo "CONFIG_GRUB_EFI_IMAGES=y" >> .config
-          echo "CONFIG_TARGET_ROOTFS_SECUREBOOT=y" >> .config
-          echo "CONFIG_PACKAGE_efibooty=y" >> .config
-          echo "CONFIG_PACKAGE_grub2-efi=y" >> .config
-          echo "CONFIG_TARGET_ROOTFS_PARTSIZE=8192" >> .config
-          echo "CONFIG_TARGET_ROOTFS_EXT4FS=y" >> .config
-          echo "CONFIG_TARGET_ROOTFS_SQUASHFS=n" >> .config
-          echo "CONFIG_BUILD_ALL_HOST_TOOLS=m" >> .config
-          echo "CONFIG_BUILD_PATENTED=y" >> .config
+          echo "CONFIG_TARGET_x86_64_GENERIC=y" >> .config
           echo "CONFIG_PACKAGE_luci=y" >> .config
+          echo "CONFIG_LUCI_LANG_zh-cn=y" >> .config
           echo "CONFIG_PACKAGE_luci-base=y" >> .config
-          echo "CONFIG_PACKAGE_luci-lib-ipkg=y" >> .config
+          echo "CONFIG_PACKAGE_luci-mod-admin-full=y" >> .config
           echo "CONFIG_PACKAGE_luci-theme-bootstrap=y" >> .config
 
-      - name: iStore应用商店全家桶
+      - name: 基础网络工具
         run: |
-          echo "CONFIG_PACKAGE_luci-app-istorex=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-store=y" >> .config
-          echo "CONFIG_PACKAGE_istore-core=y" >> .config
-          echo "CONFIG_PACKAGE_istore-feed=y" >> .config
-          echo "CONFIG_PACKAGE_istore-store=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-firewall=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-opkg=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-ttyd=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-cifs-mount=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-nfs=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-samba4=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-wol=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-upnp=y" >> .config
 
-      - name: 游戏多开防封全家桶
+      # ========== 新增 iStore 应用商店 完整配置 ==========
+      - name: iStore 应用商店
         run: |
-          echo "CONFIG_PACKAGE_luci-app-oaf=y" >> .config
-          echo "CONFIG_PACKAGE_appfilter=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-zapret=y" >> .config
-          echo "CONFIG_PACKAGE_zapret=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-gameprotect=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-randommac=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-macspoof=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-ipseg=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-store=y" >> .config
+          echo "CONFIG_PACKAGE_luci-i18n-store-zh-cn=y" >> .config
+          echo "CONFIG_PACKAGE_istored=y" >> .config
+          echo "CONFIG_PACKAGE_istore-core=y" >> .config
+          echo "CONFIG_PACKAGE_istore-file=y" >> .config
+          echo "CONFIG_PACKAGE_istore-web=y" >> .config
+
+      - name: 四大件全家桶
+        run: |
+          echo "CONFIG_PACKAGE_luci-app-passwall=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-passwall2=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-openclash=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-homeproxy=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-vssr=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-ssr-plus=y" >> .config
+
+      - name: 游戏加速全家桶
+        run: |
+          echo "CONFIG_PACKAGE_luci-app-ipsec=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-sessionisolator=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-gameaccelerator=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-devicemask=y" >> .config
@@ -108,8 +115,8 @@ EOF
       - name: 手机备份全家桶
         run: |
           echo "CONFIG_PACKAGE_luci-app-backuprestore=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-icloudpd=y" >> .config
-          echo "CONFIG_PACKAGE_icloudpd=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-icloupd=y" >> .config
+          echo "CONFIG_PACKAGE_icloupd=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-rsyncd=y" >> .config
           echo "CONFIG_PACKAGE_rsync=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-syncthing=y" >> .config
@@ -129,8 +136,6 @@ EOF
           echo "CONFIG_PACKAGE_dockerd=y" >> .config
           echo "CONFIG_PACKAGE_docker-compose=y" >> .config
           echo "CONFIG_PACKAGE_docker-compose-v2=y" >> .config
-          echo "CONFIG_PACKAGE_libnetwork=y" >> .config
-          echo "CONFIG_PACKAGE_libdocker=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-dockerman=y" >> .config
           echo "CONFIG_PACKAGE_luci-lib-docker=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-docker-backup=y" >> .config
@@ -140,11 +145,10 @@ EOF
           echo "CONFIG_PACKAGE_docker-macvlan=y" >> .config
           echo "CONFIG_PACKAGE_docker-ipvlan=y" >> .config
           echo "CONFIG_PACKAGE_docker-networking=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-docker-ipseg=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-docker-ipsec=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-docker-macspoof=y" >> .config
-          echo "CONFIG_PACKAGE_docker-storage=y" >> .config
-          echo "CONFIG_PACKAGE_docker-overlay2=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-docker-storage=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-docker-overlay2=y" >> .config
           echo "CONFIG_PACKAGE_kmod-fs-btrfs=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-docker-qbittorrent=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-docker-nginx=y" >> .config
@@ -171,5 +175,5 @@ EOF
       - name: 上传固件文件
         uses: actions/upload-artifact@v4.4.3
         with:
-          name: OpenWrt四大全家桶固件
+          name: OpenWrt四大家桶+商店固件
           path: bin/targets/x86/64/generic/*.img.gz
