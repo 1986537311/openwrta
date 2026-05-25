@@ -2,14 +2,15 @@ name: Build OpenWrt x86 All-In-One Firmware
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 2 1 * *'  # 每月1号凌晨2点自动编译更新
+    - cron: '0 2 1 * *'
   push:
     branches:
-      - '*'
+      - 25.12
 
 env:
   REPO_OWNER: 1986537311
-  REPO_NAME: openwrta  # 注意：你的仓库名是 openwrta，不是 openwrt！
+  REPO_NAME: openwrta
+  REPO_BRANCH: 25.12
   TARGET: x86
   SUBTARGET: 64
   IMAGE_NAME: openwrt-x86_64-combined-squashfs
@@ -22,6 +23,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: ${{ env.REPO_OWNER }}/${{ env.REPO_NAME }}
+          ref: ${{ env.REPO_BRANCH }}
           fetch-depth: 0
 
       - name: Install dependencies
@@ -31,11 +33,10 @@ jobs:
           ncurses-dev zlib1g-dev gawk gettext unzip file lib32gcc-s1 \
           libc6-dev-i386 python3 python3-pip qemu-utils genisoimage
 
-      - name: Add third-party feeds
+      - name: Add third-party feeds (无语法错误版)
         run: |
-          # 必须先进入源码目录
           cd $GITHUB_WORKSPACE
-          cat >> feeds.conf.default << 'EOF'
+          cat >> feeds.conf.default <<'EOF'
           src-git helloworld https://github.com/fw876/helloworld.git;main
           src-git passwall https://github.com/xiaorouji/openwrt-passwall.git;main
           src-git small https://github.com/kenzok8/small.git
@@ -48,11 +49,10 @@ jobs:
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
-      - name: Generate .config (x86 64 + 全家桶完整配置)
+      - name: Generate .config (纯配置无多余字符)
         run: |
           cd $GITHUB_WORKSPACE
-          cat > .config << 'EOF'
-          # 基础系统配置
+          cat > .config <<'EOF'
           CONFIG_TARGET_x86=y
           CONFIG_TARGET_x86_64=y
           CONFIG_TARGET_x86_64_DEVICE_generic=y
@@ -67,7 +67,6 @@ jobs:
           CONFIG_PACKAGE_luci-theme-design=y
           CONFIG_PACKAGE_luci-theme-material=y
 
-          # 商店全家桶
           CONFIG_PACKAGE_luci-app-opkg=y
           CONFIG_PACKAGE_luci-app-store=y
           CONFIG_PACKAGE_luci-app-luci-app-store=y
@@ -77,7 +76,6 @@ jobs:
           CONFIG_PACKAGE_luci-app-advanced-reboot=y
           CONFIG_PACKAGE_luci-app-advancedsettings=y
 
-          # Docker全家桶
           CONFIG_PACKAGE_docker=y
           CONFIG_PACKAGE_dockerd=y
           CONFIG_PACKAGE_containerd=y
@@ -91,7 +89,6 @@ jobs:
           CONFIG_PACKAGE_luci-app-docker=y
           CONFIG_PACKAGE_luci-app-dockerman-full=y
 
-          # 游戏防封/网络优化全家桶
           CONFIG_PACKAGE_luci-app-openclash=y
           CONFIG_PACKAGE_luci-i18n-openclash-zh-cn=y
           CONFIG_PACKAGE_luci-app-passwall=y
@@ -114,7 +111,6 @@ jobs:
           CONFIG_PACKAGE_nftables=y
           CONFIG_PACKAGE_iptables-mod-fullconenat=y
 
-          # 手机备份/NAS全家桶
           CONFIG_PACKAGE_luci-app-fileassistant=y
           CONFIG_PACKAGE_luci-app-cloudreve=y
           CONFIG_PACKAGE_luci-app-aria2=y
@@ -137,7 +133,6 @@ jobs:
           CONFIG_PACKAGE_cloudreve=y
           CONFIG_PACKAGE_fileassistant=y
 
-          # 系统工具全家桶
           CONFIG_PACKAGE_luci-app-ttyd=y
           CONFIG_PACKAGE_luci-app-cpufreq=y
           CONFIG_PACKAGE_luci-app-statistics=y
@@ -176,11 +171,8 @@ jobs:
       - name: Customize system configuration
         run: |
           cd $GITHUB_WORKSPACE
-          # 修改默认IP为192.168.1.1
           sed -i 's/192.168.1.1/192.168.1.1/g' package/base-files/files/bin/config_generate
-          # 开启SSH默认登录
           sed -i 's#/bin/login#/bin/ash#g' package/base-files/files/etc/inittab
-          # 配置服务开机自启
           echo "docker enable" >> package/base-files/files/etc/rc.local
           echo "dockerd enable" >> package/base-files/files/etc/rc.local
           echo "/etc/init.d/openclash enable" >> package/base-files/files/etc/rc.local
