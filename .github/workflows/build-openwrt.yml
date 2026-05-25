@@ -1,4 +1,4 @@
-name: OpenWrt x86_64 全品类全家桶完整版固件
+name: OpenWrt x86_64 游戏防封+Docker+备份全家桶固件
 on:
   workflow_dispatch:
     inputs:
@@ -10,10 +10,6 @@ on:
     - cron: '0 2 1 * *'
   push:
     branches: [25.12]
-    paths:
-      - '.github/workflows/**'
-      - 'package/**'
-      - 'config/**'
 
 jobs:
   build:
@@ -46,45 +42,22 @@ jobs:
           restore-keys: |
             ${{ github.ref_name }}-openwrt-cache-
 
-      - name: 缓存参数配置
-        run: |
-          sudo apt install -y ccache
-          echo "CCACHE_DIR=~/.ccache" >> $GITHUB_ENV
-          echo "CCACHE_MAXSIZE=12G" >> $GITHUB_ENV
-          echo "CCACHE_COMPRESS=true" >> $GITHUB_ENV
-
-      - name: 同步上游最新代码
-        run: |
-          git remote add upstream https://github.com/Lienol/openwrt.git || true
-          git fetch upstream
-          git reset --hard upstream/25.12
-          git clean -df
-
-      - name: 写入全部插件源
+      - name: 写入必需插件源
         run: |
           echo "src-git packages https://github.com/openwrt/packages.git;openwrt-25.12" > feeds.conf.default
           echo "src-git luci https://github.com/openwrt/luci.git;openwrt-25.12" >> feeds.conf.default
-          echo "src-git routing https://github.com/openwrt/routing.git;openwrt-25.12" >> feeds.conf.default
-          echo "src-git telephony https://github.com/openwrt/telephony.git;openwrt-25.12" >> feeds.conf.default
           echo "src-git lienol https://github.com/Lienol/openwrt-package.git" >> feeds.conf.default
           echo "src-git istore https://github.com/linkease/istore.git" >> feeds.conf.default
-          echo "src-git istore-packages https://github.com/linkease/istore-packages.git" >> feeds.conf.default
-          echo "src-git passwall-packages https://github.com/OpenWrt-Passwall/openwrt-passwall-packages.git" >> feeds.conf.default
           echo "src-git passwall https://github.com/xiaorouji/openwrt-passwall.git" >> feeds.conf.default
           echo "src-git small https://github.com/kenzok8/small.git" >> feeds.conf.default
-          echo "src-git small-pkg https://github.com/kenzok8/small-package.git" >> feeds.conf.default
           echo "src-git backup https://github.com/wukongdaily/OpenBackRestore.git" >> feeds.conf.default
-          echo "src-git icloud https://github.com/boredazfcuk/docker-icloudpd.git" >> feeds.conf.default
           echo "src-git oaf https://github.com/destan19/OpenAppFilter.git" >> feeds.conf.default
           echo "src-git gameprotect https://github.com/StressOzz/Zapret-Manager.git" >> feeds.conf.default
           echo "src-git dockerpkg https://github.com/lisaac/luci-app-dockerman.git" >> feeds.conf.default
-          echo "src-git ddnsplus https://github.com/sirpdboy/luci-app-ddns.git" >> feeds.conf.default
-          echo "src-git alist https://github.com/sirpdboy/luci-app-alist.git" >> feeds.conf.default
-          echo "src-git verysync https://github.com/linkease/luci-app-verysync.git" >> feeds.conf.default
           echo "src-git fingerprint https://github.com/openwrt-fingerprint/random.git" >> feeds.conf.default
           echo "src-git proxytool https://github.com/openwrt-proxy/switch.git" >> feeds.conf.default
 
-      - name: 系统架构基础配置
+      - name: 系统架构与基础界面
         run: |
           echo "CONFIG_TARGET_x86=y" >> .config
           echo "CONFIG_TARGET_x86_64=y" >> .config
@@ -99,68 +72,12 @@ jobs:
           echo "CONFIG_TARGET_ROOTFS_SQUASHFS=n" >> .config
           echo "CONFIG_BUILD_ALL_HOST_TOOLS=m" >> .config
           echo "CONFIG_BUILD_PATENTED=y" >> .config
-
-      - name: 网页界面组件
-        run: |
           echo "CONFIG_PACKAGE_luci=y" >> .config
           echo "CONFIG_PACKAGE_luci-base=y" >> .config
           echo "CONFIG_PACKAGE_luci-lib-ipkg=y" >> .config
-          echo "CONFIG_PACKAGE_luci-lib-jsonc=y" >> .config
-          echo "CONFIG_PACKAGE_luci-lib-json=y" >> .config
-          echo "CONFIG_PACKAGE_luci-lib-nixio=y" >> .config
-          echo "CONFIG_PACKAGE_luci-mod-admin-full=y" >> .config
-          echo "CONFIG_PACKAGE_luci-mod-network=y" >> .config
-          echo "CONFIG_PACKAGE_luci-mod-status=y" >> .config
-          echo "CONFIG_PACKAGE_luci-mod-system=y" >> .config
           echo "CONFIG_PACKAGE_luci-theme-bootstrap=y" >> .config
 
-      - name: 系统管理全套插件
-        run: |
-          echo "CONFIG_PACKAGE_luci-app-firewall=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-opkg=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-network=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-system=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-upnp=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-autoreboot=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-cpufreq=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-tempcontrol=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-sysupgrade=y" >> .config
-
-      - name: 多拨负载均衡
-        run: |
-          echo "CONFIG_PACKAGE_luci-app-mwan3=y" >> .config
-          echo "CONFIG_PACKAGE_mwan3=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-mwan-support=y" >> .config
-
-      - name: 网络加速优化
-        run: |
-          echo "CONFIG_PACKAGE_luci-app-turboacc=y" >> .config
-          echo "CONFIG_PACKAGE_turboacc=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-sqm=y" >> .config
-          echo "CONFIG_PACKAGE_sqm-scripts=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-flowoffload=y" >> .config
-
-      - name: DNS解析过滤
-        run: |
-          echo "CONFIG_PACKAGE_luci-app-adguardhome=y" >> .config
-          echo "CONFIG_PACKAGE_adguardhome=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-smartdns=y" >> .config
-          echo "CONFIG_PACKAGE_smartdns=y" >> .config
-          echo "CONFIG_PACKAGE_dnsmasq-full=y" >> .config
-
-      - name: 主流代理插件合集
-        run: |
-          echo "CONFIG_PACKAGE_luci-app-openclash=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-passwall=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-ssr-plus=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-bypass=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-v2ray=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-lucky=y" >> .config
-          echo "CONFIG_PACKAGE_xray-core=y" >> .config
-          echo "CONFIG_PACKAGE_trojan=y" >> .config
-          echo "CONFIG_PACKAGE_hysteria=y" >> .config
-
-      - name: 游戏隔离伪装防封全套
+      - name: 游戏多开防封全家桶
         run: |
           echo "CONFIG_PACKAGE_luci-app-oaf=y" >> .config
           echo "CONFIG_PACKAGE_appfilter=y" >> .config
@@ -181,7 +98,7 @@ jobs:
           echo "CONFIG_PACKAGE_luci-app-trafficmask=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-packetrandom=y" >> .config
 
-      - name: 安卓苹果全机型备份
+      - name: 手机备份全家桶
         run: |
           echo "CONFIG_PACKAGE_luci-app-backuprestore=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-icloudpd=y" >> .config
@@ -198,10 +115,8 @@ jobs:
           echo "CONFIG_PACKAGE_alist=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-webdav=y" >> .config
           echo "CONFIG_PACKAGE_webdav=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-verysync=y" >> .config
-          echo "CONFIG_PACKAGE_verysync=y" >> .config
 
-      - name: Docker引擎+管理+网络存储全套
+      - name: Docker全家桶
         run: |
           echo "CONFIG_PACKAGE_docker=y" >> .config
           echo "CONFIG_PACKAGE_dockerd=y" >> .config
@@ -224,70 +139,13 @@ jobs:
           echo "CONFIG_PACKAGE_docker-overlay2=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-docker-storage=y" >> .config
           echo "CONFIG_PACKAGE_kmod-fs-btrfs=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-docker-alist=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-docker-qbittorrent=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-docker-jellyfin=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-docker-hass=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-docker-nginx=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-docker-mysql=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-docker-redis=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-docker-php=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-docker-monitor=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-docker-log=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-docker-exec=y" >> .config
-
-      - name: 文件共享服务
-        run: |
-          echo "CONFIG_PACKAGE_luci-app-samba4=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-nfs=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-mountd=y" >> .config
-
-      - name: 下载网盘工具
-        run: |
-          echo "CONFIG_PACKAGE_luci-app-aria2=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-qbittorrent=y" >> .config
-
-      - name: 远程穿透监控
-        run: |
-          echo "CONFIG_PACKAGE_luci-app-frpc=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-nps=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-nlbwmon=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-wol=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-keepalived=y" >> .config
-
-      - name: 防火墙防护工具
-        run: |
-          echo "CONFIG_PACKAGE_luci-app-sshguard=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-bruteforce-protection=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-sguiguard=y" >> .config
-
-      - name: 动态域名与激活
-        run: |
-          echo "CONFIG_PACKAGE_luci-app-ddns=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-kms=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-hosts=y" >> .config
-
-      - name: 网卡硬盘USB驱动
-        run: |
-          echo "CONFIG_PACKAGE_kmod-igb=y" >> .config
-          echo "CONFIG_PACKAGE_kmod-ixgbe=y" >> .config
-          echo "CONFIG_PACKAGE_kmod-r8169=y" >> .config
-          echo "CONFIG_PACKAGE_kmod-r8125=y" >> .config
-          echo "CONFIG_PACKAGE_kmod-atl=y" >> .config
-          echo "CONFIG_PACKAGE_kmod-fs-ntfs=y" >> .config
-          echo "CONFIG_PACKAGE_kmod-fs-exfat=y" >> .config
-          echo "CONFIG_PACKAGE_kmod-fs-ext4=y" >> .config
-          echo "CONFIG_PACKAGE_kmod-usb-storage=y" >> .config
-          echo "CONFIG_PACKAGE_kmod-usb3=y" >> .config
-
-      - name: 命令运维工具
-        run: |
-          echo "CONFIG_PACKAGE_curl=y" >> .config
-          echo "CONFIG_PACKAGE_tmux=y" >> .config
-          echo "CONFIG_PACKAGE_nano=y" >> .config
-          echo "CONFIG_PACKAGE_net-tools=y" >> .config
-          echo "CONFIG_PACKAGE_unzip=y" >> .config
-          echo "CONFIG_PACKAGE_python3=y" >> .config
 
       - name: 更新插件索引
         run: |
@@ -303,12 +161,8 @@ jobs:
         run: |
           make -j$(nproc) V=0 || make -j1 V=s
 
-      - name: 列出编译成品
-        run: |
-          ls -la bin/targets/x86/64/generic/
-
       - name: 上传固件文件
         uses: actions/upload-artifact@v4.4.3
         with:
-          name: OpenWrt全品类全家桶固件
+          name: OpenWrt-游戏防封Docker备份全套固件
           path: bin/targets/x86/64/generic/*.img.gz
