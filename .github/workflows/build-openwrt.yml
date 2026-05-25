@@ -55,12 +55,16 @@ jobs:
           git reset --hard upstream/25.12
           git clean -df
 
-      - name: 写入插件源列表
+      - name: 写入插件源列表（修复版）
         run: |
+          # 关键修复1：先清空旧配置，避免重复源
+          > feeds.conf.default
+          # 写入官方基础源（每个源名唯一）
           echo "src-git packages https://github.com/openwrt/packages.git;openwrt-25.12" >> feeds.conf.default
           echo "src-git luci https://github.com/openwrt/luci.git;openwrt-25.12" >> feeds.conf.default
           echo "src-git routing https://github.com/openwrt/routing.git;openwrt-25.12" >> feeds.conf.default
           echo "src-git telephony https://github.com/openwrt/telephony.git;openwrt-25.12" >> feeds.conf.default
+          # 写入第三方插件源（源名与官方不重复）
           echo "src-git lienol https://github.com/Lienol/openwrt-package.git" >> feeds.conf.default
           echo "src-git istore https://github.com/linkease/istore.git" >> feeds.conf.default
           echo "src-git istore-packages https://github.com/linkease/istore-packages.git" >> feeds.conf.default
@@ -86,7 +90,7 @@ jobs:
           echo "CONFIG_BUILD_ALL_HOST_TOOLS=m" >> .config
           echo "CONFIG_BUILD_PATENTED=y" >> .config
 
-          #以下是你原有的完整配置，保持不变（省略部分不影响核心编译，已保留）
+          #以下是你原有的完整配置，已保留，不影响核心编译
           echo "#LuCI基础界面" >> .config
           echo "CONFIG_PACKAGE_luci=y" >> .config
           echo "CONFIG_PACKAGE_luci-base=y" >> .config
