@@ -1,136 +1,72 @@
-name: Build OpenWrt x86 All-In-One Firmware
+name: OpenWrt x86 Build
 on:
   workflow_dispatch:
   schedule:
     - cron: '0 2 1 * *'
-  push:
-    branches:
-      - 25.12
-
-env:
-  REPO_OWNER: 1986537311
-  REPO_NAME: openwrta
-  REPO_BRANCH: 25.12
-  TARGET: x86
-  SUBTARGET: 64
-  IMAGE_NAME: openwrt-x86_64-combined-squashfs
 
 jobs:
   build:
     runs-on: ubuntu-22.04
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
-          repository: ${{ env.REPO_OWNER }}/${{ env.REPO_NAME }}
-          ref: ${{ env.REPO_BRANCH }}
+          repository: 1986537311/openwrta
+          ref: 25.12
           fetch-depth: 0
 
-      - name: Install dependencies
+      - name: Install Dependencies
         run: |
-          sudo apt update && sudo apt install -y \
-          build-essential flex bison git-core libssl-dev libelf-dev \
-          ncurses-dev zlib1g-dev gawk gettext unzip file lib32gcc-s1 \
-          libc6-dev-i386 python3 python3-pip qemu-utils genisoimage
+          sudo apt update && sudo apt install -y build-essential flex bison git libssl-dev libelf-dev ncurses-dev zlib1g-dev gawk gettext unzip file lib32gcc-s1 python3
 
-      - name: Clear and rewrite feeds.conf.default (无注释无多余字符)
+      - name: Setup Feeds
         run: |
           cd $GITHUB_WORKSPACE
-          # 先清空原有文件，再写入纯英文配置
-          cat > feeds.conf.default <<'EOF'
+          cat > feeds.conf.default <<'END'
           src-git base https://git.openwrt.org/openwrt/openwrt.git;openwrt-25.12
           src-git packages https://git.openwrt.org/feed/packages.git;openwrt-25.12
           src-git luci https://git.openwrt.org/project/luci.git;openwrt-25.12
-          src-git routing https://git.openwrt.org/feed/routing.git;openwrt-25.12
-          src-git telephony https://git.openwrt.org/feed/telephony.git;openwrt-25.12
           src-git helloworld https://github.com/fw876/helloworld.git;main
           src-git passwall https://github.com/xiaorouji/openwrt-passwall.git;main
           src-git openclash https://github.com/vernesong/OpenClash.git;master
-          src-git luci-app-fileassistant https://github.com/linkease/luci-app-fileassistant.git;main
-          src-git luci-app-cloudreve https://github.com/cloudreve/luci-app-cloudreve.git;main
-          EOF
+          END
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
-      - name: Generate clean .config (纯配置无多余字符)
+      - name: Configure Firmware
         run: |
           cd $GITHUB_WORKSPACE
-          cat > .config <<'EOF'
+          cat > .config <<'END'
           CONFIG_TARGET_x86=y
           CONFIG_TARGET_x86_64=y
           CONFIG_TARGET_x86_64_DEVICE_generic=y
           CONFIG_TARGET_ROOTFS_SQUASHFS=y
           CONFIG_TARGET_ROOTFS_PARTSIZE=512
-          CONFIG_TARGET_IMAGES_GZIP=y
-          CONFIG_TARGET_IMAGES_ISO=y
           CONFIG_PACKAGE_luci=y
-          CONFIG_PACKAGE_luci-base=y
-          CONFIG_PACKAGE_luci-theme-bootstrap=y
           CONFIG_PACKAGE_luci-theme-argon=y
-          CONFIG_PACKAGE_luci-theme-design=y
-          CONFIG_PACKAGE_luci-theme-material=y
-
           CONFIG_PACKAGE_luci-app-opkg=y
           CONFIG_PACKAGE_luci-app-store=y
-          CONFIG_PACKAGE_luci-app-luci-app-store=y
-          CONFIG_PACKAGE_luci-i18n-luci-app-store-zh-cn=y
-
           CONFIG_PACKAGE_docker=y
           CONFIG_PACKAGE_dockerd=y
-          CONFIG_PACKAGE_containerd=y
-          CONFIG_PACKAGE_docker-compose=y
           CONFIG_PACKAGE_luci-app-dockerman=y
-          CONFIG_PACKAGE_luci-i18n-dockerman-zh-cn=y
-          CONFIG_PACKAGE_kmod-docker=y
-          CONFIG_PACKAGE_cgroupfs-mount=y
-
           CONFIG_PACKAGE_luci-app-openclash=y
-          CONFIG_PACKAGE_luci-i18n-openclash-zh-cn=y
           CONFIG_PACKAGE_luci-app-passwall=y
-          CONFIG_PACKAGE_luci-i18n-passwall-zh-cn=y
-          CONFIG_PACKAGE_luci-app-ssr-plus=y
-          CONFIG_PACKAGE_luci-i18n-ssr-plus-zh-cn=y
-          CONFIG_PACKAGE_kmod-tcp-bbr=y
-          CONFIG_PACKAGE_fullcone=y
-
-          CONFIG_PACKAGE_luci-app-fileassistant=y
-          CONFIG_PACKAGE_luci-app-cloudreve=y
           CONFIG_PACKAGE_luci-app-aria2=y
-          CONFIG_PACKAGE_luci-i18n-aria2-zh-cn=y
-          CONFIG_PACKAGE_luci-app-syncthing=y
-          CONFIG_PACKAGE_luci-i18n-syncthing-zh-cn=y
           CONFIG_PACKAGE_luci-app-samba4=y
-          CONFIG_PACKAGE_samba4-server=y
-
+          CONFIG_PACKAGE_luci-app-syncthing=y
           CONFIG_PACKAGE_luci-app-ttyd=y
           CONFIG_PACKAGE_luci-app-cpufreq=y
-          CONFIG_PACKAGE_luci-app-upnp=y
-          CONFIG_PACKAGE_luci-app-wol=y
-          CONFIG_PACKAGE_luci-app-ddns=y
-          CONFIG_PACKAGE_luci-app-adguardhome=y
-          EOF
-          ./scripts/feeds install -a
+          END
           make defconfig
           make -j$(nproc) download
 
-      - name: System customization
-        run: |
-          cd $GITHUB_WORKSPACE
-          sed -i 's/192.168.1.1/192.168.1.1/g' package/base-files/files/bin/config_generate
-          sed -i 's#/bin/login#/bin/ash#g' package/base-files/files/etc/inittab
-          echo "docker enable" >> package/base-files/files/etc/rc.local
-          echo "dockerd enable" >> package/base-files/files/etc/rc.local
-          echo "/etc/init.d/openclash enable" >> package/base-files/files/etc/rc.local
-          echo "/etc/init.d/samba4 enable" >> package/base-files/files/etc/rc.local
-
-      - name: Compile firmware
+      - name: Compile
         run: |
           cd $GITHUB_WORKSPACE
           make -j$(nproc) V=s
 
-      - name: Upload artifacts
+      - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: OpenWrt-x86-Firmware
-          path: bin/targets/x86/64/${IMAGE_NAME}.img.gz
-          retention-days: 30
+          name: OpenWrt-x86
+          path: bin/targets/x86/64/openwrt-x86_64-combined-squashfs.img.gz
+
