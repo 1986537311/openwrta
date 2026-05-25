@@ -1,4 +1,4 @@
-name: Build OpenWrt x86_64 8G全能固件
+name: Build OpenWrt x86_64 8G终极全能固件
 
 on:
   workflow_dispatch:
@@ -289,6 +289,50 @@ jobs:
           echo "CONFIG_PACKAGE_bonding-tools=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-bonding=y" >> .config
 
+          echo "#影音多媒体播放" >> .config
+          echo "CONFIG_PACKAGE_luci-app-jd-dailybonus=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-kodexplorer=y" >> .config
+          echo "CONFIG_PACKAGE_kodexplorer=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-musicwall=y" >> .config
+
+          echo "#网管管控家长控制" >> .config
+          echo "CONFIG_PACKAGE_luci-app-accesscontrol=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-timecontrol=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-wifidog=y" >> .config
+
+          echo "#虚拟机&虚拟网卡拓展" >> .config
+          echo "CONFIG_PACKAGE_qemu-img=y" >> .config
+          echo "CONFIG_PACKAGE_vde2=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-vmtools=y" >> .config
+
+          echo "#网络安全防护" >> .config
+          echo "CONFIG_PACKAGE_luci-app-sshguard=y" >> .config
+          echo "CONFIG_PACKAGE_sshguard=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-bruteforce-protection=y" >> .config
+
+          echo "#游戏网络加速优化" >> .config
+          echo "CONFIG_PACKAGE_luci-app-gameaccelerator=y" >> .config
+          echo "CONFIG_PACKAGE_gameaccelerator=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-lancache=y" >> .config
+
+          echo "#USB打印机共享" >> .config
+          echo "CONFIG_PACKAGE_luci-app-p910nd=y" >> .config
+          echo "CONFIG_PACKAGE_p910nd=y" >> .config
+          echo "CONFIG_PACKAGE_usb-printer-support=y" >> .config
+
+          echo "#DDNS动态域名" >> .config
+          echo "CONFIG_PACKAGE_luci-app-ddns=y" >> .config
+          echo "CONFIG_PACKAGE_ddns-scripts=y" >> .config
+
+          echo "#Windows激活全套工具" >> .config
+          echo "CONFIG_PACKAGE_luci-app-winactivate=y" >> .config
+          echo "CONFIG_PACKAGE_winactivate=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-kms=y" >> .config
+          echo "CONFIG_PACKAGE_kms-server=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-officeactivate=y" >> .config
+          echo "CONFIG_PACKAGE_officeactivate=y" >> .config
+          echo "CONFIG_PACKAGE_windows-license-tools=y" >> .config
+
       - name: 更新安装全部插件
         run: |
           ./scripts/feeds update -a
@@ -306,5 +350,5 @@ jobs:
       - name: 上传成品固件
         uses: actions/upload-artifact@v4
         with:
-          name: x86_64全能固件_上网备份监控穿透聚合
+          name: x86_64终极全能固件_全功能Windows激活版
           path: bin/targets/x86/64/generic-ext4-combined.img.gz
