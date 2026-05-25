@@ -8,11 +8,10 @@ on:
       - 25.12
 
 env:
-  REPO_URL: https://github.com/1986537311/openwrt
+  REPO_OWNER: 1986537311
+  REPO_NAME: openwrt
   REPO_BRANCH: 25.12
   CONFIG_FILE: .config
-  DIY_SCRIPT: diy-part1.sh
-  DIY_PART2: diy-part2.sh
   TARGET: x86
   SUBTARGET: 64
   IMAGE_NAME: openwrt-x86_64-combined-squashfs
@@ -24,7 +23,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          repository: ${{ env.REPO_URL }}
+          repository: ${{ env.REPO_OWNER }}/${{ env.REPO_NAME }}
           ref: ${{ env.REPO_BRANCH }}
           fetch-depth: 0
 
@@ -35,43 +34,20 @@ jobs:
           ncurses-dev zlib1g-dev gawk gettext unzip file lib32gcc-s1 \
           libc6-dev-i386 python3 python3-pip qemu-utils genisoimage
 
-      - name: Update feeds and install packages
+      - name: Add third-party feeds
         run: |
-          ./scripts/feeds update -a
-          ./scripts/feeds install -a
-
-      - name: Run pre-build customization (diy-part1.sh)
-        run: |
-          cat > diy-part1.sh << 'EOF'
-          #!/bin/bash
-          # 1. 添加第三方软件源
-          echo "src-git helloworld https://github.com/fw876/helloworld.git;main" >> feeds.conf.default
-          echo "src-git passwall https://github.com/xiaorouji/openwrt-passwall.git;main" >> feeds.conf.default
-          echo "src-git small https://github.com/kenzok8/small.git" >> feeds.conf.default
-          echo "src-git smallpackage https://github.com/kenzok8/small-package.git" >> feeds.conf.default
-          echo "src-git openclash https://github.com/vernesong/OpenClash.git;master" >> feeds.conf.default
-          echo "src-git luci-app-fileassistant https://github.com/linkease/luci-app-fileassistant.git;main" >> feeds.conf.default
-          echo "src-git luci-app-cloudreve https://github.com/cloudreve/luci-app-cloudreve.git;main" >> feeds.conf.default
-          echo "src-git luci-app-v2raya https://github.com/v2rayA/luci-app-v2raya.git;main" >> feeds.conf.default
-
-          # 2. 更新并安装第三方源
-          ./scripts/feeds update -a
-          ./scripts/feeds install -a
-
-          # 3. 安装全家桶依赖
-          # Docker全家桶依赖
-          opkg install docker dockerd luci-app-dockerman luci-i18n-dockerman-zh-cn containerd cgroupfs-mount kmod-docker
-          # 游戏防封全家桶依赖
-          opkg install luci-app-openclash luci-app-passwall luci-app-passwall2 luci-app-ssr-plus luci-app-bypass luci-app-v2raya
-          # 手机备份全家桶依赖
-          opkg install luci-app-fileassistant luci-app-cloudreve luci-app-aria2 luci-app-rsync luci-app-nas luci-app-syncthing luci-i18n-syncthing-zh-cn
-          # 商店全家桶依赖
-          opkg install luci-app-opkg luci-app-store luci-app-luci-app-store luci-i18n-luci-app-store-zh-cn
-          # 基础网络工具
-          opkg install luci-app-firewall luci-app-upnp luci-app-nlbwmon luci-app-statistics luci-app-ttyd luci-app-cpufreq luci-app-advanced-reboot
+          cat >> feeds.conf.default << 'EOF'
+          src-git helloworld https://github.com/fw876/helloworld.git;main
+          src-git passwall https://github.com/xiaorouji/openwrt-passwall.git;main
+          src-git small https://github.com/kenzok8/small.git
+          src-git smallpackage https://github.com/kenzok8/small-package.git
+          src-git openclash https://github.com/vernesong/OpenClash.git;master
+          src-git luci-app-fileassistant https://github.com/linkease/luci-app-fileassistant.git;main
+          src-git luci-app-cloudreve https://github.com/cloudreve/luci-app-cloudreve.git;main
+          src-git luci-app-v2raya https://github.com/v2rayA/luci-app-v2raya.git;main
           EOF
-          chmod +x diy-part1.sh
-          ./diy-part1.sh
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
 
       - name: Generate .config (x86 64 + 全家桶完整配置)
         run: |
@@ -197,26 +173,19 @@ jobs:
           make defconfig
           make -j$(nproc) download
 
-      - name: Run post-build customization (diy-part2.sh)
+      - name: Customize system configuration
         run: |
-          cat > diy-part2.sh << 'EOF'
-          #!/bin/bash
-          # 1. 修改默认IP为192.168.1.1
+          # 修改默认IP为192.168.1.1
           sed -i 's/192.168.1.1/192.168.1.1/g' package/base-files/files/bin/config_generate
-          # 2. 开启SSH默认登录
+          # 开启SSH默认登录
           sed -i 's#/bin/login#/bin/ash#g' package/base-files/files/etc/inittab
-          # 3. 配置Docker开机自启
+          # 配置服务开机自启
           echo "docker enable" >> package/base-files/files/etc/rc.local
           echo "dockerd enable" >> package/base-files/files/etc/rc.local
-          # 4. 配置OpenClash开机自启
           echo "/etc/init.d/openclash enable" >> package/base-files/files/etc/rc.local
-          # 5. 配置Samba/文件共享开机自启
           echo "/etc/init.d/samba4 enable" >> package/base-files/files/etc/rc.local
           echo "/etc/init.d/aria2 enable" >> package/base-files/files/etc/rc.local
           echo "/etc/init.d/syncthing enable" >> package/base-files/files/etc/rc.local
-          EOF
-          chmod +x diy-part2.sh
-          ./diy-part2.sh
 
       - name: Compile firmware
         run: |
