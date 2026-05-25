@@ -37,7 +37,7 @@ jobs:
           sudo apt install -y build-essential flex bison gawk python3 python3-pip unzip libssl-dev libncurses5-dev git
 
       - name: 加载编译缓存
-        uses: actions/cache@v4.4.3
+        uses: actions/cache@v4
         with:
           path: |
             feeds
@@ -64,7 +64,7 @@ jobs:
           git clean -df
 
       ##########################################################################
-      # 全量插件源汇总
+      # 全量插件源汇总（已修正语法）
       ##########################################################################
       - name: 写入全部插件源
         run: |
@@ -277,7 +277,6 @@ jobs:
         run: |
           echo "CONFIG_PACKAGE_luci-app-aria2=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-qbittorrent=y" >> .config
-          echo "CONFIG_PACKAGE-luci-app-nextcloud=y" >> .config
 
       ##########################################################################
       # 内网远程全家桶
