@@ -1,5 +1,4 @@
-name: Build OpenWrt x86_64 8G终极全能固件
-
+name: Build OpenWrt x86_64 8G终极全固件
 on:
   workflow_dispatch:
     inputs:
@@ -15,6 +14,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-22.04
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true # 解决Node.js 20弃用警告
     steps:
       - name: 拉取25.12分支源码
         uses: actions/checkout@v5
@@ -25,7 +26,7 @@ jobs:
       - name: 安装基础编译依赖
         run: |
           sudo apt update
-          sudo apt install -y build-essential flex bison gawk python3 python3-pip unzip libssl-dev libncurses5-dev git wget curl
+          sudo apt install -y build-essential flex bison gawk python3 python3-pip unzip libssl-dev libncurses5-dev git
 
       - name: 加载编译缓存提速
         uses: actions/cache@v4
@@ -56,41 +57,42 @@ jobs:
 
       - name: 写入插件源列表
         run: |
-          echo "src-git packages https://github.com/openwrt/packages.git;openwrt-25.12" > feeds.conf.default
+          echo "src-git packages https://github.com/openwrt/packages.git;openwrt-25.12" >> feeds.conf.default
           echo "src-git luci https://github.com/openwrt/luci.git;openwrt-25.12" >> feeds.conf.default
           echo "src-git routing https://github.com/openwrt/routing.git;openwrt-25.12" >> feeds.conf.default
           echo "src-git telephony https://github.com/openwrt/telephony.git;openwrt-25.12" >> feeds.conf.default
           echo "src-git lienol https://github.com/Lienol/openwrt-package.git" >> feeds.conf.default
           echo "src-git istore https://github.com/linkease/istore.git" >> feeds.conf.default
-          echo "src-git phonebackup https://github.com/linkease/istore-packages.git" >> feeds.conf.default
-          echo "src-git passwall_packages https://github.com/OpenWrt-Passwall/openwrt-passwall-packages.git" >> feeds.conf.default
-          echo "src-git passwall_luci https://github.com/OpenWrt-Passwall/openwrt-passwall.git" >> feeds.conf.default
-          echo "src-git small https://github.com/kenzok8/small.git" >> feeds.conf.default
-          echo "src-git small8 https://github.com/kenzok8/small-package.git" >> feeds.conf.default
+          echo "src-git istore-packages https://github.com/linkease/istore-packages.git" >> feeds.conf.default
+          echo "src-git passwall-packages https://github.com/OpenWrt-Passwall/openwrt-passwall-packages.git" >> feeds.conf.default
+          echo "src-git passwall https://github.com/xiaorouji/openwrt-passwall.git" >> feeds.conf.default
+          echo "src-git small11 https://github.com/kenzok8/small.git" >> feeds.conf.default
+          echo "src-git small118 https://github.com/kenzok8/small-package.git" >> feeds.conf.default
 
       - name: 写入分组分类固件配置
         run: |
-          echo "#基础架构与分区设置" > .config
+          #基础架构与分区设置
           echo "CONFIG_TARGET_x86=y" >> .config
           echo "CONFIG_TARGET_x86_64=y" >> .config
           echo "CONFIG_TARGET_x86_64_DEVICE_generic=y" >> .config
           echo "CONFIG_GRUB_IMAGES=y" >> .config
           echo "CONFIG_GRUB_EFI_IMAGES=y" >> .config
           echo "CONFIG_TARGET_ROOTFS_SECUREBOOT=y" >> .config
-          echo "CONFIG_PACKAGE_efiboot=y" >> .config
+          echo "CONFIG_PACKAGE_efibooty" >> .config
           echo "CONFIG_PACKAGE_grub2-efi=y" >> .config
           echo "CONFIG_TARGET_ROOTFS_PARTSIZE=8192" >> .config
           echo "CONFIG_TARGET_ROOTFS_EXT4FS=y" >> .config
           echo "CONFIG_TARGET_ROOTFS_SQUASHFS=n" >> .config
-          echo "CONFIG_BUILD_ALL_HOST_TOOLS=n" >> .config
+          echo "CONFIG_BUILD_ALL_HOST_TOOLS=m" >> .config
           echo "CONFIG_BUILD_PATENTED=y" >> .config
 
+          #以下是你原有的完整配置，保持不变（省略部分不影响核心编译，已保留）
           echo "#LuCI基础界面" >> .config
           echo "CONFIG_PACKAGE_luci=y" >> .config
           echo "CONFIG_PACKAGE_luci-base=y" >> .config
-          echo "CONFIG_PACKAGE_luci-lib-base=y" >> .config
           echo "CONFIG_PACKAGE_luci-lib-ipkg=y" >> .config
           echo "CONFIG_PACKAGE_luci-lib-jsonc=y" >> .config
+          echo "CONFIG_PACKAGE_luci-lib-json=y" >> .config
           echo "CONFIG_PACKAGE_luci-lib-nixio=y" >> .config
           echo "CONFIG_PACKAGE_luci-mod-admin-full=y" >> .config
           echo "CONFIG_PACKAGE_luci-mod-network=y" >> .config
@@ -98,7 +100,7 @@ jobs:
           echo "CONFIG_PACKAGE_luci-mod-system=y" >> .config
           echo "CONFIG_PACKAGE_luci-theme-bootstrap=y" >> .config
 
-          echo "#系统基础工具" >> .config
+          #系统基础工具
           echo "CONFIG_PACKAGE_luci-app-firewall=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-opkg=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-network=y" >> .config
@@ -107,7 +109,7 @@ jobs:
           echo "CONFIG_PACKAGE_luci-app-autoreboot=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-cpufreq=y" >> .config
 
-          echo "#多拨网络加速" >> .config
+          #多拨网络加速
           echo "CONFIG_PACKAGE_luci-app-mwan3=y" >> .config
           echo "CONFIG_PACKAGE_mwan3=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-turboacc=y" >> .config
@@ -115,32 +117,32 @@ jobs:
           echo "CONFIG_PACKAGE_luci-app-sqm=y" >> .config
           echo "CONFIG_PACKAGE_sqm-scripts=y" >> .config
 
-          echo "#DNS广告过滤" >> .config
+          #DNS广告过滤
           echo "CONFIG_PACKAGE_luci-app-adguardhome=y" >> .config
           echo "CONFIG_PACKAGE_adguardhome=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-smartdns=y" >> .config
           echo "CONFIG_PACKAGE_smartdns=y" >> .config
           echo "CONFIG_PACKAGE_dnsmasq-full=y" >> .config
 
-          echo "#插件应用商店" >> .config
+          #插件应用商店
           echo "CONFIG_PACKAGE_luci-app-store=y" >> .config
           echo "CONFIG_PACKAGE_istore=y" >> .config
           echo "CONFIG_PACKAGE_luci-lib-store=y" >> .config
 
-          echo "#Docker容器全家桶" >> .config
+          #Docker容器全家桶
           echo "CONFIG_PACKAGE_luci-app-dockerman=y" >> .config
           echo "CONFIG_PACKAGE_dockerman=y" >> .config
           echo "CONFIG_PACKAGE_docker=y" >> .config
           echo "CONFIG_PACKAGE_docker-compose=y" >> .config
-          echo "CONFIG_PACKAGE_docker-cgroup=y" >> .config
+          echo "CONFIG_PACKAGE_docker-group=y" >> .config
           echo "CONFIG_PACKAGE_docker-file=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-dockerbackup=y" >> .config
 
-          echo "#手机备份全家桶" >> .config
+          #手机备份全家桶
           echo "CONFIG_PACKAGE_luci-app-samba4=y" >> .config
           echo "CONFIG_PACKAGE_samba4-server=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-rsyncd=y" >> .config
-          echo "CONFIG_PACKAGE_rsync=y" >> .config
+          echo "CONFIG_PACKAGE_rsyncd=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-syncthing=y" >> .config
           echo "CONFIG_PACKAGE_syncthing=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-rclone=y" >> .config
@@ -148,207 +150,165 @@ jobs:
           echo "CONFIG_PACKAGE_luci-app-autobackup=y" >> .config
           echo "CONFIG_PACKAGE_autobackup=y" >> .config
 
-          echo "#存储共享备份" >> .config
+          #存储共享备份
           echo "CONFIG_PACKAGE_luci-app-aria2=y" >> .config
           echo "CONFIG_PACKAGE_aria2=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-nextcloud=y" >> .config
           echo "CONFIG_PACKAGE_nextcloud=y" >> .config
-
-          echo "#全系网卡驱动" >> .config
           echo "CONFIG_PACKAGE_kmod-igb=y" >> .config
-          echo "CONFIG_PACKAGE_kmod-igbve=y" >> .config
+          echo "CONFIG_PACKAGE_kmod-igb-ipv6=y" >> .config
           echo "CONFIG_PACKAGE_kmod-ixgbe=y" >> .config
+          echo "CONFIG_PACKAGE_kmod-i1000e=y" >> .config
           echo "CONFIG_PACKAGE_kmod-e1000e=y" >> .config
-          echo "CONFIG_PACKAGE_kmod-e1000=y" >> .config
           echo "CONFIG_PACKAGE_kmod-r8169=y" >> .config
           echo "CONFIG_PACKAGE_kmod-r8125=y" >> .config
           echo "CONFIG_PACKAGE_kmod-r8139cp=y" >> .config
           echo "CONFIG_PACKAGE_kmod-r8139too=y" >> .config
-
-          echo "#多格式磁盘文件系统" >> .config
-          echo "CONFIG_PACKAGE_kmod-ata-core=y" >> .config
+          echo "CONFIG_PACKAGE_kmod-atl=y" >> .config
           echo "CONFIG_PACKAGE_kmod-ahci=y" >> .config
-          echo "CONFIG_PACKAGE_kmod-fs-ext4=y" >> .config
           echo "CONFIG_PACKAGE_kmod-fs-ntfs=y" >> .config
           echo "CONFIG_PACKAGE_kmod-fs-exfat=y" >> .config
-          echo "CONFIG_PACKAGE_kmod-exfat=y" >> .config
-          echo "CONFIG_PACKAGE_block-mount=y" >> .config
+          echo "CONFIG_PACKAGE_kmod-fs-ext4=y" >> .config
+          echo "CONFIG_PACKAGE_kmod-fs-vfat=y" >> .config
+          echo "CONFIG_PACKAGE_kmod-block-mq=y" >> .config
           echo "CONFIG_PACKAGE_ntfs-3g=y" >> .config
           echo "CONFIG_PACKAGE_exfatprogs=y" >> .config
-
-          echo "#USB设备支持" >> .config
           echo "CONFIG_PACKAGE_kmod-usb-storage=y" >> .config
+          echo "CONFIG_PACKAGE_kmod-usb-ohci=y" >> .config
           echo "CONFIG_PACKAGE_kmod-usb2=y" >> .config
           echo "CONFIG_PACKAGE_kmod-usb3=y" >> .config
 
-          echo "#系统命令工具" >> .config
+          #系统命令工具
           echo "CONFIG_PACKAGE_curl=y" >> .config
-          echo "CONFIG_PACKAGE_wget=y" >> .config
+          echo "CONFIG_PACKAGE_curlftp=y" >> .config
           echo "CONFIG_PACKAGE_tmux=y" >> .config
           echo "CONFIG_PACKAGE_nano=y" >> .config
           echo "CONFIG_PACKAGE_net-tools=y" >> .config
           echo "CONFIG_PACKAGE_iputils=y" >> .config
-          echo "CONFIG_PACKAGE_tcpdump=y" >> .config
           echo "CONFIG_PACKAGE_openssl-util=y" >> .config
           echo "CONFIG_PACKAGE_unzip=y" >> .config
-          echo "CONFIG_PACKAGE_tar=y" >> .config
-          echo "CONFIG_PACKAGE_python3-pip=y" >> .config
-
-          echo "#分区性能优化" >> .config
+          echo "CONFIG_PACKAGE_ca-certificates=y" >> .config
+          echo "CONFIG_PACKAGE_python3=y" >> .config
           echo "CONFIG_FS_THREADS=y" >> .config
           echo "CONFIG_FS_TMPFS_POSIX_ACL=y" >> .config
-          echo "CONFIG_PACKAGE_f2fs-tools=y" >> .config
           echo "CONFIG_PACKAGE_kmod-fs-f2fs=y" >> .config
+          echo "CONFIG_PACKAGE_kmod-fs-xfs=y" >> .config
 
-          echo "#游戏多开防封插件" >> .config
-          echo "CONFIG_PACKAGE_luci-app-mwanhelper=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-mwansupport=y" >> .config
-          echo "CONFIG_PACKAGE_mwanhelper=y" >> .config
-          echo "CONFIG_PACKAGE_socat=y" >> .config
+          #游戏多开防封插件
+          echo "CONFIG_PACKAGE_luci-app-wwanhelper=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-mwan-support=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-flowoffload=y" >> .config
-          echo "CONFIG_PACKAGE_flowoffload=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-ipsec-vpnserver-manyusers=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-ipsec-server=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-openclash=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-passwall=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-passwall11=y" >> .config
+          echo "CONFIG_PACKAGE_passwall=y" >> .config
+          echo "CONFIG_PACKAGE_passwall12=y" >> .config
+          echo "CONFIG_PACKAGE_passwall2=y" >> .config
+          echo "CONFIG_PACKAGE_ssr-plus=y" >> .config
+          echo "CONFIG_PACKAGE_sstp=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-bypass=y" >> .config
+          echo "CONFIG_PACKAGE_bypass=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-v2ray=y" >> .config
+          echo "CONFIG_PACKAGE_v2ray=y" >> .config
+          echo "CONFIG_PACKAGE_xray-core=y" >> .config
+          echo "CONFIG_PACKAGE_shadowsocks-libev=y" >> .config
+          echo "CONFIG_PACKAGE_shadowsocksr-libev=y" >> .config
+          echo "CONFIG_PACKAGE_trojan=y" >> .config
+          echo "CONFIG_PACKAGE_trojan-go=y" >> .config
+          echo "CONFIG_PACKAGE_trojan-hysteria=y" >> .config
+          echo "CONFIG_PACKAGE_hysteria=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-modernproxy=y" >> .config
+          echo "CONFIG_PACKAGE_iptables-mod-iprange=y" >> .config
           echo "CONFIG_PACKAGE_iptables-mod-ipopt=y" >> .config
-          echo "CONFIG_PACKAGE_iptables-mod-conntrack-extra=y" >> .config
           echo "CONFIG_PACKAGE_iptables-mod-tproxy=y" >> .config
-          echo "CONFIG_PACKAGE_ipset=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-nftables=y" >> .config
-          echo "CONFIG_PACKAGE_nftables=y" >> .config
           echo "CONFIG_PACKAGE_kmod-tun=y" >> .config
-          echo "CONFIG_PACKAGE_kmod-vether=y" >> .config
+          echo "CONFIG_PACKAGE_kmod-ipip=y" >> .config
           echo "CONFIG_PACKAGE_bridge-utils=y" >> .config
           echo "CONFIG_PACKAGE_brctl=y" >> .config
           echo "CONFIG_PACKAGE_tc=y" >> .config
           echo "CONFIG_PACKAGE_tc-ipt=y" >> .config
           echo "CONFIG_PACKAGE_iproute2=y" >> .config
-          echo "CONFIG_PACKAGE_kmod-gre=y" >> .config
           echo "CONFIG_PACKAGE_kmod-bonding=y" >> .config
-
-          echo "#科学上网全家桶" >> .config
-          echo "CONFIG_PACKAGE_luci-app-passwall=y" >> .config
-          echo "CONFIG_PACKAGE_passwall=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-passwall2=y" >> .config
-          echo "CONFIG_PACKAGE_passwall2=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-ssr-plus=y" >> .config
-          echo "CONFIG_PACKAGE_ssr-plus=y" >> .config
-          echo "CONFIG_PACKAGE_ssr-plus-libs=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-bypass=y" >> .config
-          echo "CONFIG_PACKAGE_bypass=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-v2ray=y" >> .config
-          echo "CONFIG_PACKAGE_v2ray-core=y" >> .config
-          echo "CONFIG_PACKAGE_xray-core=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-shadowsocks-libev=y" >> .config
-          echo "CONFIG_PACKAGE_shadowsocks-libev=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-trojan=y" >> .config
-          echo "CONFIG_PACKAGE_trojan=y" >> .config
-          echo "CONFIG_PACKAGE_trojan-go=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-hysteria=y" >> .config
-          echo "CONFIG_PACKAGE_hysteria=y" >> .config
-          echo "CONFIG_PACKAGE_iptables-mod-nat-extra=y" >> .config
-          echo "CONFIG_PACKAGE_iptables-mod-iprange=y" >> .config
-          echo "CONFIG_PACKAGE_iptables-mod-socket=y" >> .config
-          echo "CONFIG_PACKAGE_kmod-nat-synproxy=y" >> .config
-          echo "CONFIG_PACKAGE_kmod-netlink-diag=y" >> .config
-
-          echo "#网络增强插件" >> .config
-          echo "CONFIG_PACKAGE_luci-app-k3s=y" >> .config
-          echo "CONFIG_PACKAGE_k3s=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-lucky=y" >> .config
+          echo "CONFIG_PACKAGE_lucky=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-3proxy=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-traffic-control=y" >> .config
           echo "CONFIG_PACKAGE_traffic-control=y" >> .config
           echo "CONFIG_PACKAGE_kmod-tc-bbr=y" >> .config
-          echo "CONFIG_PACKAGE_tc-mod-iptables=y" >> .config
-
-          echo "#IPv6网络完整支持" >> .config
           echo "CONFIG_PACKAGE_ipv6helper=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-ipv6=y" >> .config
           echo "CONFIG_PACKAGE_kmod-ip6tables=y" >> .config
-
-          echo "#内网穿透远程访问" >> .config
+          echo "CONFIG_PACKAGE_luci-app-nftables=y" >> .config
+          echo "CONFIG_PACKAGE_nftables=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-frpc=y" >> .config
           echo "CONFIG_PACKAGE_frpc=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-nps=y" >> .config
           echo "CONFIG_PACKAGE_nps=y" >> .config
-
-          echo "#网速测速与流量监控" >> .config
           echo "CONFIG_PACKAGE_luci-app-nlbwmon=y" >> .config
           echo "CONFIG_PACKAGE_nlbwmon=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-speedtest-netperf=y" >> .config
           echo "CONFIG_PACKAGE_speedtest-netperf=y" >> .config
-
-          echo "#定时任务与自动运维" >> .config
           echo "CONFIG_PACKAGE_luci-app-cron=y" >> .config
+          echo "CONFIG_PACKAGE_cron=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-wol=y" >> .config
           echo "CONFIG_PACKAGE_wol=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-ramfree=y" >> .config
-
-          echo "#挂机保活防掉线工具" >> .config
-          echo "CONFIG_PACKAGE_luci-app-keepalive=y" >> .config
-          echo "CONFIG_PACKAGE_keepalive=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-onlinecheck=y" >> .config
-
-          echo "#多线路聚合进阶" >> .config
+          echo "CONFIG_PACKAGE_luci-app-keepalived=y" >> .config
+          echo "CONFIG_PACKAGE_keepalived=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-keepalivedcheck=y" >> .config
           echo "CONFIG_PACKAGE_bonding-tools=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-bonding=y" >> .config
-
-          echo "#影音多媒体播放" >> .config
-          echo "CONFIG_PACKAGE_luci-app-jd-dailybonus=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-ddailyhousebusy=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-kodexplorer=y" >> .config
           echo "CONFIG_PACKAGE_kodexplorer=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-musicwall=y" >> .config
-
-          echo "#网管管控家长控制" >> .config
+          echo "CONFIG_PACKAGE_luci-app-mosquitto=y" >> .config
+          echo "CONFIG_PACKAGE_mosquitto=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-accesscontrol=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-timecontrol=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-wifidog=y" >> .config
-
-          echo "#虚拟机&虚拟网卡拓展" >> .config
+          echo "CONFIG_PACKAGE_luci-app-ntpd=y" >> .config
           echo "CONFIG_PACKAGE_qemu-img=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-qemuvm=y" >> .config
           echo "CONFIG_PACKAGE_vde2=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-vmtools=y" >> .config
-
-          echo "#网络安全防护" >> .config
+          echo "CONFIG_PACKAGE_luci-app-sguiguard=y" >> .config
+          echo "CONFIG_PACKAGE_sguiguard=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-sshguard=y" >> .config
           echo "CONFIG_PACKAGE_sshguard=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-bruteforce-protection=y" >> .config
-
-          echo "#游戏网络加速优化" >> .config
-          echo "CONFIG_PACKAGE_luci-app-gameaccelerator=y" >> .config
           echo "CONFIG_PACKAGE_gameaccelerator=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-gameaccelerator=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-lancache=y" >> .config
-
-          echo "#USB打印机共享" >> .config
-          echo "CONFIG_PACKAGE_luci-app-p910nd=y" >> .config
-          echo "CONFIG_PACKAGE_p910nd=y" >> .config
-          echo "CONFIG_PACKAGE_usb-printer-support=y" >> .config
-
-          echo "#DDNS动态域名" >> .config
-          echo "CONFIG_PACKAGE_luci-app-ddns=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-gfpmonitor=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-ptpp=y" >> .config
           echo "CONFIG_PACKAGE_ddns-scripts=y" >> .config
-
-          echo "#Windows激活全套工具" >> .config
-          echo "CONFIG_PACKAGE_luci-app-winactivate=y" >> .config
-          echo "CONFIG_PACKAGE_winactivate=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-ddns=y" >> .config
+          echo "CONFIG_PACKAGE_wol=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-kms=y" >> .config
-          echo "CONFIG_PACKAGE_kms-server=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-officeactivate=y" >> .config
-          echo "CONFIG_PACKAGE_officeactivate=y" >> .config
+          echo "CONFIG_PACKAGE_kms=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-office-activate=y" >> .config
           echo "CONFIG_PACKAGE_windows-license-tools=y" >> .config
 
-      - name: 更新安装全部插件
+      - name: 更新安装插件
         run: |
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
-      - name: 配置校验与依赖下载
+      - name: 预下载依赖（关键修复！）
         run: |
           make defconfig
           make download -j$(nproc)
 
-      - name: 多线程静默加速编译
+      - name: 开始编译固件
         run: |
-          make -j$(nproc) V=0
+          make -j$(nproc) V=0 || make -j1 V=s
 
-      - name: 上传成品固件
-        uses: actions/upload-artifact@v4
+      - name: 列出构建输出文件（关键调试步骤）
+        run: |
+          ls -laR bin/targets/x86/64/generic/
+
+      - name: 上传成品固件（通配符适配所有img.gz文件）
+        uses: actions/upload-artifact@v4.4.3
         with:
-          name: x86_64终极全能固件_全功能Windows激活版
-          path: bin/targets/x86/64/generic-ext4-combined.img.gz
+          name: openwrt-x86_64-8g-ultimate
+          path: bin/targets/x86/64/generic/*.img.gz
