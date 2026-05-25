@@ -1,179 +1,153 @@
-name: OpenWrt x86_64 四大家桶固件
+name: OpenWrt x86_64 全插件固件
 
 on:
+  repository_dispatch:
   workflow_dispatch:
     inputs:
-      runnow:
-        description: 手动点击启动编译
+      ssh:
+        description: 'SSH connection to Actions'
         required: false
-        default: false
+        default: 'false'
   schedule:
-    - cron: '0 2 1 * *'  # 每月1号凌晨2点自动编译
-  push:
-    branches: [25.12]
+    - cron: 0 2 1 * *
+
+env:
+  REPO_URL: https://github.com/Lienol/openwrt
+  REPO_BRANCH: 25.12
+  CONFIG_FILE: .config
+  DIY_P1_SH: diy-part1.sh
+  DIY_P2_SH: diy-part2.sh
+  TZ: Asia/Shanghai
 
 jobs:
   build:
     runs-on: ubuntu-22.04
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
     steps:
-      - name: 拉取源码
-        uses: actions/checkout@v5
-        with:
-          repository: Lienol/openwrt
-          ref: 25.12
-          fetch-depth: 0
+    - name: 检查磁盘空间
+      run: |
+        df -h
+        sudo rm -rf /usr/share/dotnet /etc/apt/sources.list.d /usr/local/lib/android
+        sudo swapoff -a
+        sudo rm -f /swapfile /mnt/swapfile
 
-      - name: 安装编译依赖
-        run: |
-          sudo apt update
-          sudo apt install -y build-essential flex bison gawk python3 python3-pip unzip libssl-dev libncurses-dev zlib1g-dev file wget
+    - name: 拉取源码
+      uses: actions/checkout@main
+      with:
+        repository: ${{ env.REPO_URL }}
+        ref: ${{ env.REPO_BRANCH }}
+        fetch-depth: 0
 
-      - name: 加载编译缓存
-        uses: actions/cache@v4
-        with:
-          path: |
-            feeds
-            build_dir
-            staging_dir
-            tmp
-            ~/.ccache
-          key: ${{ github.ref_name }}-openwrt-cache-${{ github.sha }}
-          restore-keys: |
-            ${{ github.ref_name }}-openwrt-cache-
+    - name: 生成配置文件
+      run: |
+        rm -f .config
+        touch .config
 
-      - name: 写入 feeds 源
-        run: |
-          cat > feeds.conf.default << 'EOF'
-          src-git packages https://github.com/openwrt/packages.git;openwrt-25.12
-          src-git luci https://github.com/openwrt/luci.git;openwrt-25.12
-          src-git lienol https://github.com/Lienol/openwrt-package.git
-          src-git istore https://github.com/linkease/istore.git
-          src-git istore-packages https://github.com/linkease/istore-packages.git
-          src-git passwall https://github.com/xiaorouji/openwrt-passwall.git
-          src-git small https://github.com/kenzok8/small.git
-          src-git backup https://github.com/wukongdaily/OpenBackRestore.git
-          src-git oaf https://github.com/destan19/OpenAppFilter.git
-          src-git gameprotect https://github.com/StressOzz/Zapret-Manager.git
-          src-git dockerpkg https://github.com/lisaac/luci-app-dockerman.git
-          EOF
+        # ---------------- 系统基础配置 ----------------
+        echo "CONFIG_TARGET_x86=y" >> .config
+        echo "CONFIG_TARGET_x86_64=y" >> .config
+        echo "CONFIG_TARGET_x86_64_GENERIC=y" >> .config
+        echo "CONFIG_TARGET_PROFILE=DEVICE_generic" >> .config
+        echo "CONFIG_TARGET_PACKAGES=" >> .config
+        echo "CONFIG_DEVEL=y" >> .config
+        echo "CONFIG_CCACHE=y" >> .config
+        echo "CONFIG_IB=y" >> .config
 
-      - name: 系统架构与基础界面
-        run: |
-          echo "CONFIG_TARGET_x86=y" >> .config
-          echo "CONFIG_TARGET_x86_64=y" >> .config
-          echo "CONFIG_TARGET_x86_64_GENERIC=y" >> .config
-          echo "CONFIG_PACKAGE_luci=y" >> .config
-          echo "CONFIG_LUCI_LANG_zh-cn=y" >> .config
-          echo "CONFIG_PACKAGE_luci-base=y" >> .config
-          echo "CONFIG_PACKAGE_luci-mod-admin-full=y" >> .config
-          echo "CONFIG_PACKAGE_luci-theme-bootstrap=y" >> .config
+        # ---------------- LuCI 基础 ----------------
+        echo "CONFIG_PACKAGE_luci=y" >> .config
+        echo "CONFIG_LUCI_LANG_zh_Hans=y" >> .config
+        echo "CONFIG_PACKAGE_luci-base=y" >> .config
+        echo "CONFIG_PACKAGE_luci-mod-admin-full=y" >> .config
+        echo "CONFIG_PACKAGE_luci-theme-bootstrap=y" >> .config
+        echo "CONFIG_PACKAGE_luci-app-firewall=y" >> .config
+        echo "CONFIG_PACKAGE_luci-app-opkg=y" >> .config
+        echo "CONFIG_PACKAGE_luci-app-upnp=y" >> .config
+        echo "CONFIG_PACKAGE_luci-app-samba=y" >> .config
 
-      - name: 基础网络工具
-        run: |
-          echo "CONFIG_PACKAGE_luci-app-firewall=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-opkg=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-ttyd=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-cifs-mount=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-nfs=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-samba4=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-wol=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-upnp=y" >> .config
+        # ---------------- iStore 应用商店 ----------------
+        echo "CONFIG_PACKAGE_luci-app-store=y" >> .config
+        echo "CONFIG_PACKAGE_luci-i18n-store-zh-cn=y" >> .config
+        echo "CONFIG_PACKAGE_istore=y" >> .config
+        echo "CONFIG_PACKAGE_istore-core=y" >> .config
+        echo "CONFIG_PACKAGE_istore-web=y" >> .config
 
-      # ========== 新增 iStore 应用商店 完整配置 ==========
-      - name: iStore 应用商店
-        run: |
-          echo "CONFIG_PACKAGE_luci-app-store=y" >> .config
-          echo "CONFIG_PACKAGE_luci-i18n-store-zh-cn=y" >> .config
-          echo "CONFIG_PACKAGE_istored=y" >> .config
-          echo "CONFIG_PACKAGE_istore-core=y" >> .config
-          echo "CONFIG_PACKAGE_istore-file=y" >> .config
-          echo "CONFIG_PACKAGE_istore-web=y" >> .config
+        # ---------------- 四大家桶 (PassWall/OpenClash) ----------------
+        echo "CONFIG_PACKAGE_luci-app-passwall=y" >> .config
+        echo "CONFIG_PACKAGE_luci-app-passwall2=y" >> .config
+        echo "CONFIG_PACKAGE_luci-app-openclash=y" >> .config
+        echo "CONFIG_PACKAGE_luci-app-ssr-plus=y" >> .config
+        echo "CONFIG_PACKAGE_luci-app-vssr=y" >> .config
 
-      - name: 四大件全家桶
-        run: |
-          echo "CONFIG_PACKAGE_luci-app-passwall=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-passwall2=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-openclash=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-homeproxy=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-vssr=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-ssr-plus=y" >> .config
+        # ---------------- 游戏加速全家桶 ----------------
+        echo "CONFIG_PACKAGE_luci-app-ipsec-server=y" >> .config
+        echo "CONFIG_PACKAGE_luci-app-xlnetacc=y" >> .config
+        echo "CONFIG_PACKAGE_luci-app-games=y" >> .config
+        echo "CONFIG_PACKAGE_luci-app-nps=y" >> .config
+        echo "CONFIG_PACKAGE_luci-app-frpc=y" >> .config
+        echo "CONFIG_PACKAGE_luci-app-ddns=y" >> .config
 
-      - name: 游戏加速全家桶
-        run: |
-          echo "CONFIG_PACKAGE_luci-app-ipsec=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-sessionisolator=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-gameaccelerator=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-devicemask=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-portforward=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-randomdelay=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-loginrandom=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-trafficmask=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-packetrandom=y" >> .config
+        # ---------------- 手机备份/应用全家桶 ----------------
+        echo "CONFIG_PACKAGE_luci-app-usb-printer=y" >> .config
+        echo "CONFIG_PACKAGE_luci-app-ramfree=y" >> .config
+        echo "CONFIG_PACKAGE_luci-app-cpufreq=y" >> .config
+        echo "CONFIG_PACKAGE_luci-app-autoreboot=y" >> .config
+        echo "CONFIG_PACKAGE_luci-app-wol=y" >> .config
+        echo "CONFIG_PACKAGE_luci-app-diskman=y" >> .config
+        echo "CONFIG_PACKAGE_luci-app-sqm=y" >> .config
+        echo "CONFIG_PACKAGE_luci-app-adguardhome=y" >> .config
+        echo "CONFIG_PACKAGE_luci-app-unblockneteasemusic=y" >> .config
+        echo "CONFIG_PACKAGE_luci-app-argon-config=y" >> .config
 
-      - name: 手机备份全家桶
-        run: |
-          echo "CONFIG_PACKAGE_luci-app-backuprestore=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-icloupd=y" >> .config
-          echo "CONFIG_PACKAGE_icloupd=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-rsyncd=y" >> .config
-          echo "CONFIG_PACKAGE_rsync=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-syncthing=y" >> .config
-          echo "CONFIG_PACKAGE_syncthing=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-rclone=y" >> .config
-          echo "CONFIG_PACKAGE_rclone=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-autobackup=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-photobackup=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-alist=y" >> .config
-          echo "CONFIG_PACKAGE_alist=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-webdav=y" >> .config
-          echo "CONFIG_PACKAGE_webdav=y" >> .config
+        # ---------------- Docker 全家桶 ----------------
+        echo "CONFIG_PACKAGE_dockerd=y" >> .config
+        echo "CONFIG_PACKAGE_luci-app-docker=y" >> .config
+        echo "CONFIG_PACKAGE_luci-app-dockerman=y" >> .config
+        echo "CONFIG_PACKAGE_luci-lib-docker=y" >> .config
+        echo "CONFIG_PACKAGE_luci-app-docker-compose=y" >> .config
+        echo "CONFIG_PACKAGE_docker-compose=y" >> .config
+        echo "CONFIG_PACKAGE_luci-app-iptvhelper=y" >> .config
+        echo "CONFIG_PACKAGE_kmod-nfnetlink_queue=y" >> .config
 
-      - name: Docker全家桶
-        run: |
-          echo "CONFIG_PACKAGE_docker=y" >> .config
-          echo "CONFIG_PACKAGE_dockerd=y" >> .config
-          echo "CONFIG_PACKAGE_docker-compose=y" >> .config
-          echo "CONFIG_PACKAGE_docker-compose-v2=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-dockerman=y" >> .config
-          echo "CONFIG_PACKAGE_luci-lib-docker=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-docker-backup=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-docker-network=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-docker-volume=y" >> .config
-          echo "CONFIG_PACKAGE_docker-bridge=y" >> .config
-          echo "CONFIG_PACKAGE_docker-macvlan=y" >> .config
-          echo "CONFIG_PACKAGE_docker-ipvlan=y" >> .config
-          echo "CONFIG_PACKAGE_docker-networking=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-docker-ipsec=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-docker-macspoof=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-docker-storage=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-docker-overlay2=y" >> .config
-          echo "CONFIG_PACKAGE_kmod-fs-btrfs=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-docker-qbittorrent=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-docker-nginx=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-docker-redis=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-docker-php=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-docker-monitor=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-docker-log=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-docker-exec=y" >> .config
+        # ---------------- 其他常用工具 ----------------
+        echo "CONFIG_PACKAGE_luci-app-smartdns=y" >> .config
+        echo "CONFIG_PACKAGE_smartdns=y" >> .config
+        echo "CONFIG_PACKAGE_luci-app-advanced=y" >> .config
+        echo "CONFIG_PACKAGE_luci-app-fileassistant=y" >> .config
+        echo "CONFIG_PACKAGE_luci-app-turboacc=y" >> .config
+        echo "CONFIG_PACKAGE_luci-app-zerotier=y" >> .config
 
-      - name: 更新插件索引
-        run: |
-          ./scripts/feeds update -a
-          ./scripts/feeds install -a
+    - name: 更新 feeds
+      run: |
+        ./scripts/feeds update -a
+        ./scripts/feeds install -a
 
-      - name: 预下载编译依赖
-        run: |
-          make defconfig
-          make download -j$(nproc)
+    - name: 加载自定义配置
+      run: |
+        [ -e files ] && mv files openwrt/files
+        [ -e $CONFIG_FILE ] && mv $CONFIG_FILE openwrt/.config
 
-      - name: 执行固件编译
-        run: |
-          make -j$(nproc) V=0 || make -j1 V=s
+    - name: 下载 dl 库
+      run: |
+        cd openwrt
+        make defconfig
+        make download -j8
+        find dl -size -1024c -exec ls -l {} \;
+        find dl -size -1024c -exec rm -f {} \;
 
-      - name: 上传固件文件
-        uses: actions/upload-artifact@v4.4.3
-        with:
-          name: OpenWrt四大家桶+商店固件
-          path: bin/targets/x86/64/generic/*.img.gz
+    - name: 编译固件
+      id: compile
+      run: |
+        cd openwrt
+        echo -e "$(nproc) thread compile"
+        make -j$(nproc) || make -j1 V=s
+        echo "status=success" >> $GITHUB_OUTPUT
+        grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' > DEVICE_NAME
+        [ -s DEVICE_NAME ] && echo "DEVICE_NAME=_$(cat DEVICE_NAME)" >> $GITHUB_ENV
+        echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
+
+    - name: 上传固件
+      if: steps.compile.outputs.status == 'success'
+      uses: actions/upload-artifact@main
+      with:
+        name: OpenWrt_x86_64${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}_firmware
+        path: openwrt/bin/targets/
