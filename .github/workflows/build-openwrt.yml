@@ -1,4 +1,4 @@
-name: OpenWrt x86_64 四大全家桶完整版固件
+name: OpenWrt x86_64 四大全家桶固件
 on:
   workflow_dispatch:
     inputs:
@@ -42,19 +42,21 @@ jobs:
           restore-keys: |
             ${{ github.ref_name }}-openwrt-cache-
 
-      - name: 写入必备插件源（含iStore、已删除失效源）
+      - name: 写入feeds源（一次性写入，零语法错误）
         run: |
-          echo "src-git packages https://github.com/openwrt/packages.git;openwrt-25.12" > feeds.conf.default
-          echo "src-git luci https://github.com/openwrt/luci.git;openwrt-25.12" >> feeds.conf.default
-          echo "src-git lienol https://github.com/Lienol/openwrt-package.git" >> feeds.conf.default
-          echo "src-git istore https://github.com/linkease/istore.git" >> feeds.conf.default
-          echo "src-git istore-packages https://github.com/linkease/istore-packages.git" >> feeds.conf.default
-          echo "src-git passwall https://github.com/xiaorouji/openwrt-passwall.git" >> feeds.conf.default
-          echo "src-git small https://github.com/kenzok8/small.git" >> feeds.conf.default
-          echo "src-git backup https://github.com/wukongdaily/OpenBackRestore.git" >> feeds.conf.default
-          echo "src-git oaf https://github.com/destan19/OpenAppFilter.git" >> feeds.conf.default
-          echo "src-git gameprotect https://github.com/StressOzz/Zapret-Manager.git" >> feeds.conf.default
-          echo "src-git dockerpkg https://github.com/lisaac/luci-app-dockerman.git" >> feeds.conf.default
+          cat > feeds.conf.default << 'EOF'
+src-git packages https://github.com/openwrt/packages.git;openwrt-25.12
+src-git luci https://github.com/openwrt/luci.git;openwrt-25.12
+src-git lienol https://github.com/Lienol/openwrt-package.git
+src-git istore https://github.com/linkease/istore.git
+src-git istore-packages https://github.com/linkease/istore-packages.git
+src-git passwall https://github.com/xiaorouji/openwrt-passwall.git
+src-git small https://github.com/kenzok8/small.git
+src-git backup https://github.com/wukongdaily/OpenBackRestore.git
+src-git oaf https://github.com/destan19/OpenAppFilter.git
+src-git gameprotect https://github.com/StressOzz/Zapret-Manager.git
+src-git dockerpkg https://github.com/lisaac/luci-app-dockerman.git
+EOF
 
       - name: 系统架构与基础界面
         run: |
@@ -84,7 +86,7 @@ jobs:
           echo "CONFIG_PACKAGE_istore-feed=y" >> .config
           echo "CONFIG_PACKAGE_istore-store=y" >> .config
 
-      - name: 游戏多开防封全家桶（已删除失效插件）
+      - name: 游戏多开防封全家桶
         run: |
           echo "CONFIG_PACKAGE_luci-app-oaf=y" >> .config
           echo "CONFIG_PACKAGE_appfilter=y" >> .config
