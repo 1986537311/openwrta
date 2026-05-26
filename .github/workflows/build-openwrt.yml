@@ -1,98 +1,99 @@
-name: OpenWrt x86 All-In-One Firmware
+name: 编译 x86_64 固件
+
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '0 2 1 * *'
+  # 取消下面两行的注释，可以定时自动编译（每3天一次）
+  # schedule:
+  #   - cron: '0 20 */3 * *'
+
+env:
+  REPO_URL: https://github.com/1986537311/openwrt.git
+  REPO_BRANCH: 25.12
+  TZ: Asia/Shanghai
 
 jobs:
   build:
     runs-on: ubuntu-22.04
+
     steps:
-      - name: Free disk space
-        run: |
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/share/boost /usr/local/share/powershell /usr/share/swift
-          sudo apt-get clean
-          sudo rm -rf /var/lib/apt/lists/*
+    - name: 检出仓库
+      uses: actions/checkout@v4
 
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          repository: 1986537311/openwrta
-          ref: 25.12
-          fetch-depth: 0
+    - name: 🧹 清理磁盘空间
+      run: |
+        sudo rm -rf /opt/hostedtoolcache /usr/share/dotnet /usr/local/lib/android /usr/local/share/boost
+        sudo apt-get autoremove -y >/dev/null
+        sudo apt-get clean
+        df -h
 
-      - name: Install dependencies
-        run: |
-          sudo apt update && sudo apt install -y build-essential flex bison git libssl-dev libelf-dev ncurses-dev zlib1g-dev gawk gettext unzip file lib32gcc-s1 python3
+    - name: 📦 安装编译依赖
+      run: |
+        sudo apt-get update -qq
+        sudo apt-get install -y \
+          build-essential clang flex gawk gcc-multilib g++-multilib \
+          gettext git libncurses5-dev libssl-dev python3 python3-distutils \
+          rsync swig unzip wget xsltproc zlib1g-dev ccache ecj
 
-      - name: Setup feeds
-        run: |
-          cd $GITHUB_WORKSPACE
-          > feeds.conf.default
-          echo "src-git base https://git.openwrt.org/openwrt/openwrt.git;openwrt-25.12" >> feeds.conf.default
-          echo "src-git packages https://git.openwrt.org/feed/packages.git;openwrt-25.12" >> feeds.conf.default
-          echo "src-git luci https://git.openwrt.org/project/luci.git;openwrt-25.12" >> feeds.conf.default
-          echo "src-git helloworld https://github.com/fw876/helloworld.git;main" >> feeds.conf.default
-          echo "src-git openclash https://github.com/vernesong/OpenClash.git;master" >> feeds.conf.default
-          echo "src-git small https://github.com/kenzok8/small.git" >> feeds.conf.default
-          ./scripts/feeds update -a
-          ./scripts/feeds install -a
+    - name: 📥 克隆源码
+      run: |
+        git clone -b $REPO_BRANCH --single-branch $REPO_URL openwrt
+        ln -sf openwrt/* .
+        ls openwrt
 
-      - name: Configure firmware
-        run: |
-          cd $GITHUB_WORKSPACE
-          cat > .config << 'EOF'
-          CONFIG_TARGET_x86=y
-          CONFIG_TARGET_x86_64=y
-          CONFIG_TARGET_x86_64_DEVICE_generic=y
-          CONFIG_TARGET_ROOTFS_SQUASHFS=y
-          CONFIG_TARGET_ROOTFS_PARTSIZE=512
-          CONFIG_TARGET_IMAGES_GZIP=y
-          CONFIG_PACKAGE_luci=y
-          CONFIG_PACKAGE_luci-theme-argon=y
+    - name: ➕ 添加 Lienol 扩展源
+      run: |
+        cd openwrt
+        echo "src-git lienol https://github.com/Lienol/openwrt-package.git" >> feeds.conf.default
 
-          CONFIG_PACKAGE_luci-app-opkg=y
-          CONFIG_PACKAGE_luci-app-store=y
-          CONFIG_PACKAGE_luci-i18n-luci-app-store-zh-cn=y
+    - name: 🔄 更新 & 安装 Feeds
+      run: |
+        cd openwrt
+        ./scripts/feeds update -a
+        ./scripts/feeds install -a
 
-          CONFIG_PACKAGE_docker=y
-          CONFIG_PACKAGE_dockerd=y
-          CONFIG_PACKAGE_luci-app-dockerman=y
-          CONFIG_PACKAGE_luci-i18n-dockerman-zh-cn=y
+    - name: ⚙️ 写入 x86_64 配置
+      run: |
+        cd openwrt
+        cat > .config << 'EOF'
+        CONFIG_TARGET_x86=y
+        CONFIG_TARGET_x86_64=y
+        CONFIG_TARGET_x86_64_generic=y
+        CONFIG_DEVEL=y
+        CONFIG_CCACHE=y
+        CONFIG_GRUB_IMAGES=y
+        CONFIG_EFI_IMAGES=y
+        CONFIG_VMDK_IMAGES=y
+        CONFIG_LUCI_LANG_zh_Hans=y
+        CONFIG_PACKAGE_luci=y
+        CONFIG_PACKAGE_luci-app-firewall=y
+        CONFIG_PACKAGE_luci-app-opkg=y
+        CONFIG_PACKAGE_luci-app-ttyd=y
+        CONFIG_PACKAGE_luci-app-upnp=y
+        CONFIG_PACKAGE_luci-app-wol=y
+        CONFIG_PACKAGE_luci-app-passwall=y
+        CONFIG_PACKAGE_luci-app-openclash=y
+        CONFIG_PACKAGE_luci-app-adguardhome=y
+        CONFIG_PACKAGE_wget-ssl=y
+        CONFIG_PACKAGE_curl=y
+        CONFIG_PACKAGE_htop=y
+        CONFIG_PACKAGE_ip-full=y
+        EOF
+        make defconfig
 
-          CONFIG_PACKAGE_luci-app-openclash=y
-          CONFIG_PACKAGE_luci-i18n-openclash-zh-cn=y
-          CONFIG_PACKAGE_luci-app-ssr-plus=y
-          CONFIG_PACKAGE_luci-i18n-ssr-plus-zh-cn=y
-          CONFIG_PACKAGE_kmod-tcp-bbr=y
-          CONFIG_PACKAGE_fullcone=y
+    - name: 📦 预下载
+      run: |
+        cd openwrt
+        make download -j8
 
-          CONFIG_PACKAGE_luci-app-fileassistant=y
-          CONFIG_PACKAGE_luci-app-cloudreve=y
-          CONFIG_PACKAGE_luci-app-aria2=y
-          CONFIG_PACKAGE_luci-i18n-aria2-zh-cn=y
-          CONFIG_PACKAGE_luci-app-syncthing=y
-          CONFIG_PACKAGE_luci-i18n-syncthing-zh-cn=y
-          CONFIG_PACKAGE_luci-app-samba4=y
-          CONFIG_PACKAGE_samba4-server=y
+    - name: 🔨 开始编译
+      run: |
+        cd openwrt
+        make -j$(nproc) V=s 2>&1 | tee build.log
 
-          CONFIG_PACKAGE_luci-app-ttyd=y
-          CONFIG_PACKAGE_luci-app-cpufreq=y
-          CONFIG_PACKAGE_luci-app-upnp=y
-          CONFIG_PACKAGE_luci-app-adguardhome=y
-          EOF
-          ./scripts/feeds install -a
-          make defconfig
-          make -j$(nproc) download
+    - name: 📤 上传固件
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: openwrt-x86_64-firmware
+        path: openwrt/bin/targets/x86/64/*
 
-      - name: Compile firmware
-        run: |
-          cd $GITHUB_WORKSPACE
-          make -j$(nproc) V=s
-
-      - name: Upload firmware
-        uses: actions/upload-artifact@v4
-        with:
-          name: OpenWrt-x86-AllInOne
-          path: bin/targets/x86/64/openwrt-x86_64-combined-squashfs.img.gz
-          retention-days: 30
