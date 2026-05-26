@@ -1,4 +1,4 @@
-name: 直接拉官方源码编译 23.05.6
+name: OpenWrt 23.05.6 x86 一键编译（带兼容插件版）
 on:
   workflow_dispatch:
 
@@ -7,32 +7,38 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 360
     steps:
-      - name: 拉取官方 23.05 源码
+      # 1. 拉取官方 23.05 源码（和你仓库分支完全无关）
+      - name: 拉取官方源码
         run: |
           git clone --depth 1 --branch openwrt-23.05 https://github.com/openwrt/openwrt.git
           cd openwrt
 
-      - name: 安装依赖
+      # 2. 安装编译依赖
+      - name: 安装依赖包
         working-directory: ./openwrt
         run: |
           sudo apt update -y
           sudo apt install -y build-essential gcc g++ make cmake autoconf automake libtool pkg-config libncurses5-dev libssl-dev libxml2-dev libreadline-dev git wget curl unzip bzip2 xz-utils zlib1g-dev python3 python3-pip perl rsync subversion
 
-      - name: 配置 Feeds（仅官方 + iStore）
+      # 3. 配置 Feeds（官方源 + 兼容版small + iStore）
+      - name: 配置插件源
         working-directory: ./openwrt
         run: |
           rm -rf feeds/*
           cat > feeds.conf << EOF
           src-git packages https://git.openwrt.org/feed/packages.git;openwrt-23.05
-          src-git luci https://git.openwrt.org/feed/packages.git;openwrt-23.05
+          src-git luci https://git.openwrt.org/feed/luci.git;openwrt-23.05
           src-git routing https://git.openwrt.org/feed/routing.git;openwrt-23.05
           src-git telephony https://git.openwrt.org/feed/telephony.git;openwrt-23.05
+          # 用兼容23.05的固定提交，避免报错
+          src-git small https://github.com/kenzok8/small.git;b6d48b7
           src-git istore https://github.com/linkease/istore.git
           EOF
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
-      - name: 极简配置（只装基础功能）
+      # 4. 配置系统与插件（基础功能 + OpenClash + iStore）
+      - name: 配置系统功能
         working-directory: ./openwrt
         run: |
           echo "CONFIG_TARGET_x86=y" >> .config
@@ -40,29 +46,31 @@ jobs:
           echo "CONFIG_TARGET_x86_64_DEVICE_generic=y" >> .config
           echo "CONFIG_LUCI=y" >> .config
           echo "CONFIG_LUCI_LANG_zh-cn=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-opkg=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-openclash=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-store=y" >> .config
+          echo "CONFIG_PACKAGE_docker=y" >> .config
           make defconfig
 
-      - name: 替换清华源
+      # 5. 替换清华源（修复路径问题）
+      - name: 替换为清华镜像源
         working-directory: ./openwrt
         run: |
-          rm -f package/base-files/files/etc/opkg/distfeeds.conf
-          echo "src/gz openwrt_core https://mirrors.tuna.tsinghua.edu.cn/openwrt/releases/23.05.6/targets/x86/64/packages" >> package/base-files/files/etc/opkg/distfeeds.conf
-          echo "src/gz openwrt_base https://mirrors.tuna.tsinghua.edu.cn/openwrt/releases/23.05.6/packages/x86_64/base" >> package/base-files/files/etc/opkg/distfeeds.conf
-          echo "src/gz openwrt_luci https://mirrors.tuna.tsinghua.edu.cn/openwrt/releases/23.05.6/packages/x86_64/luci" >> package/base-files/files/etc/opkg/distfeeds.conf
-          echo "src/gz openwrt_packages https://mirrors.tuna.tsinghua.edu.cn/openwrt/releases/23.05.6/packages/x86_64/packages" >> package/base-files/files/etc/opkg/distfeeds.conf
+          sed -i 's|https://downloads.openwrt.org|https://mirrors.tuna.tsinghua.edu.cn/openwrt|g' package/base-files/files/etc/opkg/distfeeds.conf
 
+      # 6. 下载所有依赖包
       - name: 下载依赖
         working-directory: ./openwrt
         run: make download -j$(nproc)
 
-      - name: 编译
+      # 7. 编译固件
+      - name: 编译固件
         working-directory: ./openwrt
         run: make -j$(nproc) V=s
 
-      - name: 上传固件
+      # 8. 上传编译好的固件
+      - name: 上传固件包
         uses: actions/upload-artifact@v4
         with:
-          name: OpenWrt-23.05.6-x86
+          name: OpenWrt-23.05.6-x86-插件版
           path: ./openwrt/bin/targets/x86/64/
-
