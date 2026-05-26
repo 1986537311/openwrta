@@ -1,4 +1,4 @@
-name: Build x86 Firmware
+name: Build x86 Game Multi-Open Firmware
 
 on:
   workflow_dispatch:
@@ -23,7 +23,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # 3. 初始化环境
+      # 3. 初始化环境 (补全了编译游戏网络组件所需的依赖)
       - name: Init environment
         env:
           DEBIAN_FRONTEND: noninteractive
@@ -32,14 +32,16 @@ jobs:
           sudo -E apt-get -qq update
           sudo -E apt-get -qq install ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential bzip2 ccache cmake cpio curl device-tree-compiler fastjar flex gawk gcc-multilib g++-multilib gettext git gperf haveged help2man intltool libc6-dev-i386 libelf-dev libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev libncurses5-dev libncursesw5-dev libreadline-dev libssl-dev libtool lrzsz mkisofs msmtp nano ninja-build p7zip p7zip-full patch pkgconf python2.7 python3 python3-pyelftools python3-setuptools qemu-utils rsync scons squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd zlib1g-dev
 
-      # 4. 配置 Feeds 源
+      # 4. 配置 Feeds 源 (加入 PassWall 和常用游戏网络插件源)
       - name: Configure feeds
         run: |
           echo "src-git packages https://github.com/openwrt/packages.git;openwrt-23.05" > feeds.conf
           echo "src-git luci https://github.com/openwrt/luci.git;openwrt-23.05" >> feeds.conf
           echo "src-git routing https://github.com/openwrt/routing.git;openwrt-23.05" >> feeds.conf
-          echo "src-git telephony https://github.com/openwrt/telephony.git;openwrt-23.05" >> feeds.conf
-          # 添加 Lienol 商店源
+          # 加入 PassWall 核心源码
+          echo "src-git passwall https://github.com/xiaorouji/openwrt-passwall.git;main" >> feeds.conf
+          echo "src-git passwall_packages https://github.com/xiaorouji/openwrt-passwall-packages.git;main" >> feeds.conf
+          # 加入常用第三方插件源
           echo "src-git lienol https://github.com/Lienol/openwrt-package.git" >> feeds.conf
 
       # 5. 更新并安装 Feeds
@@ -47,28 +49,46 @@ jobs:
         run: |
           ./scripts/feeds update -a
           ./scripts/feeds install -a
-          # 单独确保安装商店插件
-          ./scripts/feeds install luci-app-store
 
-      # 6. 写入配置文件
+      # 6. 写入配置文件 (集成 PassWall 和游戏多开底层组件)
       - name: Write config file
         run: |
           cat > .config <<EOF
           CONFIG_TARGET_x86=y
           CONFIG_TARGET_x86_64=y
           CONFIG_TARGET_PROFILE=DEVICE_generic
-          CONFIG_PACKAGE_luci-app-store=y
-          CONFIG_PACKAGE_luci-i18n-store-zh-cn=y
-          CONFIG_PACKAGE_ipset=y
+          # 核心网络组件 (游戏防封/多开必备)
           CONFIG_PACKAGE_iptables=y
-          CONFIG_PACKAGE_kmod-nfnetlink=y
+          CONFIG_PACKAGE_iptables-mod-conntrack-extra=y
+          CONFIG_PACKAGE_iptables-mod-iprange=y
+          CONFIG_PACKAGE_iptables-mod-socket=y
+          CONFIG_PACKAGE_iptables-mod-tproxy=y
           CONFIG_PACKAGE_kmod-ipt-nat=y
-          CONFIG_PACKAGE_kmod-tun=y
-          CONFIG_PACKAGE_wget=y
-          CONFIG_PACKAGE_curl=y
+          CONFIG_PACKAGE_kmod-nf-conntrack=y
+          CONFIG_PACKAGE_kmod-nf-ipt=y
+          CONFIG_PACKAGE_dnsmasq-full=y
+          CONFIG_PACKAGE_chinadns-ng=y
+          CONFIG_PACKAGE_ipt2socks=y
+          CONFIG_PACKAGE_microsocks=y
+          CONFIG_PACKAGE_resolveip=y
+          CONFIG_PACKAGE_tcping=y
+          # PassWall 全家桶
+          CONFIG_PACKAGE_luci-app-passwall=y
+          CONFIG_PACKAGE_luci-i18n-passwall-zh-cn=y
+          CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Libev_Client=y
+          CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Libev_Server=y
+          CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Rust_Client=y
+          CONFIG_PACKAGE_luci-app-passwall_INCLUDE_V2ray_Plugin=y
+          CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Xray=y
+          CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Xray_Plugin=y
+          CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Haproxy=y
+          CONFIG_PACKAGE_luci-app-passwall_INCLUDE_NaiveProxy=y
+          # 基础工具与商店
+          CONFIG_PACKAGE_luci-app-store=y
           CONFIG_PACKAGE_htop=y
           CONFIG_PACKAGE_bash=y
-          CONFIG_PACKAGE_vim-full=y
+          CONFIG_PACKAGE_curl=y
+          CONFIG_PACKAGE_wget=y
           CONFIG_DEVEL=y
           CONFIG_CCACHE=y
           EOF
@@ -86,5 +106,5 @@ jobs:
       - name: Upload firmware
         uses: actions/upload-artifact@v4
         with:
-          name: OpenWrt-x86-firmware
+          name: OpenWrt-x86-Game-MultiOpen
           path: output/
