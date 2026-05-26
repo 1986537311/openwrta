@@ -1,4 +1,4 @@
-name: Build x86 Game Multi-Open Firmware
+name: 编译 x86 游戏防封固件
 
 on:
   workflow_dispatch:
@@ -9,7 +9,7 @@ jobs:
 
     steps:
       # 1. 清理磁盘空间
-      - name: Free disk space
+      - name: 清理磁盘空间
         uses: jlumbroso/free-disk-space@main
         with:
           tool-cache: false
@@ -19,92 +19,79 @@ jobs:
           large-packages: true
           swap-storage: true
 
-      # 2. 检出代码
-      - name: Checkout code
+      # 2. 获取代码
+      - name: 检出代码
         uses: actions/checkout@v3
 
-      # 3. 初始化环境 (补全了编译游戏网络组件所需的依赖)
-      - name: Init environment
+      # 3. 准备环境
+      - name: 初始化环境
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
           sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc
           sudo -E apt-get -qq update
-          sudo -E apt-get -qq install ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential bzip2 ccache cmake cpio curl device-tree-compiler fastjar flex gawk gcc-multilib g++-multilib gettext git gperf haveged help2man intltool libc6-dev-i386 libelf-dev libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev libncurses5-dev libncursesw5-dev libreadline-dev libssl-dev libtool lrzsz mkisofs msmtp nano ninja-build p7zip p7zip-full patch pkgconf python2.7 python3 python3-pyelftools python3-setuptools qemu-utils rsync scons squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd zlib1g-dev
+          sudo -E apt-get -qq install ack antlr3 aria2 asciidoc autoconf automake autopoint binutils bison build-essential bzip2 ccache cmake cpio curl device-tree-compiler fastjar flex gawk gettext gcc-multilib g++-multilib git gperf haveged help2man intltool libc6-dev-i386 libelf-dev libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev libncurses5-dev libncursesw5-dev libreadline-dev libssl-dev libtool lrzsk mkisofs msmtp nano ninja-build p7zip p7zip-full patch pkgconf python2.7 python3 python3-pyelftools python3-setuptools qemu-utils rsync scons squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd zlib1g-dev
 
-      # 4. 配置 Feeds 源 (加入 PassWall 和常用游戏网络插件源)
-      - name: Configure feeds
+      # 4. 配置插件源
+      - name: 配置软件源
         run: |
-          echo "src-git packages https://github.com/openwrt/packages.git;openwrt-23.05" > feeds.conf
-          echo "src-git luci https://github.com/openwrt/luci.git;openwrt-23.05" >> feeds.conf
-          echo "src-git routing https://github.com/openwrt/routing.git;openwrt-23.05" >> feeds.conf
-          # 加入 PassWall 核心源码
-          echo "src-git passwall https://github.com/xiaorouji/openwrt-passwall.git;main" >> feeds.conf
-          echo "src-git passwall_packages https://github.com/xiaorouji/openwrt-passwall-packages.git;main" >> feeds.conf
-          # 加入常用第三方插件源
-          echo "src-git lienol https://github.com/Lienol/openwrt-package.git" >> feeds.conf
+          rm -rf ./feeds.conf.default
+          echo "src-git packages https://github.com/openwrt/packages.git;openwrt-23.05" >> feeds.conf.default
+          echo "src-git luci https://github.com/openwrt/luci.git;openwrt-23.05" >> feeds.conf.default
+          echo "src-git routing https://github.com/openwrt/routing.git;openwrt-23.05" >> feeds.conf.default
+          echo "src-git telephony https://github.com/openwrt/telephony.git;openwrt-23.05" >> feeds.conf.default
+          # 添加商店源
+          echo "src-git store https://github.com/istore/istore" >> feeds.conf.default
+          # 添加 PassWall 源（游戏多开核心）
+          echo "src-git passwall https://github.com/xiaorouji/openwrt-passwall" >> feeds.conf.default
+          echo "src-git passwall_packages https://github.com/xiaorouji/openwrt-passwall-packages" >> feeds.conf.default
 
-      # 5. 更新并安装 Feeds
-      - name: Install feeds
+      # 5. 下载插件
+      - name: 更新并安装软件源
         run: |
           ./scripts/feeds update -a
           ./scripts/feeds install -a
+          ./scripts/feeds install -a -p store
+          # 安装 PassWall 相关组件
+          ./scripts/feeds install -d y luci-app-passwall
+          ./scripts/feeds install -d y luci-app-passwall_packages
 
-      # 6. 写入配置文件 (集成 PassWall 和游戏多开底层组件)
-      - name: Write config file
+      # 6. 写入配置
+      - name: 写入配置文件
         run: |
-          cat > .config <<EOF
-          CONFIG_TARGET_x86=y
-          CONFIG_TARGET_x86_64=y
-          CONFIG_TARGET_PROFILE=DEVICE_generic
-          # 核心网络组件 (游戏防封/多开必备)
-          CONFIG_PACKAGE_iptables=y
-          CONFIG_PACKAGE_iptables-mod-conntrack-extra=y
-          CONFIG_PACKAGE_iptables-mod-iprange=y
-          CONFIG_PACKAGE_iptables-mod-socket=y
-          CONFIG_PACKAGE_iptables-mod-tproxy=y
-          CONFIG_PACKAGE_kmod-ipt-nat=y
-          CONFIG_PACKAGE_kmod-nf-conntrack=y
-          CONFIG_PACKAGE_kmod-nf-ipt=y
-          CONFIG_PACKAGE_dnsmasq-full=y
-          CONFIG_PACKAGE_chinadns-ng=y
-          CONFIG_PACKAGE_ipt2socks=y
-          CONFIG_PACKAGE_microsocks=y
-          CONFIG_PACKAGE_resolveip=y
-          CONFIG_PACKAGE_tcping=y
-          # PassWall 全家桶
-          CONFIG_PACKAGE_luci-app-passwall=y
-          CONFIG_PACKAGE_luci-i18n-passwall-zh-cn=y
-          CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Libev_Client=y
-          CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Libev_Server=y
-          CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Rust_Client=y
-          CONFIG_PACKAGE_luci-app-passwall_INCLUDE_V2ray_Plugin=y
-          CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Xray=y
-          CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Xray_Plugin=y
-          CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Haproxy=y
-          CONFIG_PACKAGE_luci-app-passwall_INCLUDE_NaiveProxy=y
-          # 基础工具与商店
-          CONFIG_PACKAGE_luci-app-store=y
-          CONFIG_PACKAGE_htop=y
-          CONFIG_PACKAGE_bash=y
-          CONFIG_PACKAGE_curl=y
-          CONFIG_PACKAGE_wget=y
-          CONFIG_DEVEL=y
-          CONFIG_CCACHE=y
-          EOF
+          # 复制配置模板（这里假设你根目录有一个 .config 文件，如果没有，它会使用默认配置）
+          # 如果没有自定义 .config 文件，这一步会生成一个默认的 x86 配置
+          echo "CONFIG_TARGET_x86_64=y" >> .config
+          echo "CONFIG_TARGET_x86_64_DEVICE_generic=y" >> .config
+          # 开启商店
+          echo "CONFIG_PACKAGE_luci-app-istore=y" >> .config
+          # 开启 PassWall
+          echo "CONFIG_PACKAGE_luci-app-passwall=y" >> .config
+          # 开启常用游戏/防封工具
+          echo "CONFIG_PACKAGE_ipset=y" >> .config
+          echo "CONFIG_PACKAGE_iptables-mod-tproxy=y" >> .config
+          echo "CONFIG_PACKAGE_kmod-tun=y" >> .config
+          echo "CONFIG_PACKAGE_chinadns-ng=y" >> .config
+          # 开启 IPv6 支持
+          echo "CONFIG_PACKAGE_ip6tables=y" >> .config
+          # 优化设置
+          echo "CONFIG_PACKAGE_luci-compat=y" >> .config
+          echo "CONFIG_PACKAGE_luci-lib-ipkg=y" >> .config
+          # 默认主题
+          echo "CONFIG_LUCI_LANG_zh-cn=y" >> .config
+          # 读取默认配置并更新
+          make defconfig
 
-      # 7. 编译固件
-      - name: Compile firmware
-        id: compile
+      # 7. 开始编译
+      - name: 编译固件
         run: |
-          make -j$(nproc) download
-          make -j$(nproc) || exit 1
-          mkdir -p output
-          cp bin/targets/x86/64/* output/
+          echo "编译开始..."
+          make download -j$(nproc)
+          make -j$(nproc)
 
       # 8. 上传固件
-      - name: Upload firmware
+      - name: 上传固件
         uses: actions/upload-artifact@v4
         with:
-          name: OpenWrt-x86-Game-MultiOpen
-          path: output/
+          name: OpenWrt_x86_64_Firmware
+          path: bin/targets/
