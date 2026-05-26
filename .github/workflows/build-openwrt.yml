@@ -1,93 +1,149 @@
-name: 编译 x86 游戏防封固件
+name: OpenWrt 25.12.4 大内存防爆版 完整功能无删减
 
 on:
   workflow_dispatch:
+    inputs:
+      CONFIG_FILE:
+        description: 配置文件
+        required: false
+        default: '.config'
 
 jobs:
   build:
     runs-on: ubuntu-22.04
-
     steps:
-      # 1. 清理磁盘空间
-      - name: 清理磁盘空间
-        uses: jlumbroso/free-disk-space@main
+      - name: 拉取 Lienol 最新稳定代码
+        uses: actions/checkout@v4.2.2
         with:
-          tool-cache: false
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: true
-          swap-storage: true
+          repository: Lienol/openwrt
+          ref: openwrt-25.12
+          fetch-depth: 0
 
-      # 2. 获取源码
-      - name: 检出代码
-        uses: actions/checkout@v3
-
-      # 3. 准备编译环境
-      - name: 初始化环境
+      - name: 安装编译依赖
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
-          sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc
-          sudo -E apt-get -qq update
-          sudo -E apt-get -qq install ack antlr3 aria2 asciidoc autoconf automake autopoint binutils bison build-essential bzip2 ccache cmake cpio curl device-tree-compiler fastjar flex gawk gettext gcc-multilib g++-multilib git gperf haveged help2man intltool libc6-dev-i386 libelf-dev libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev libncurses5-dev libncursesw5-dev libreadline-dev libssl-dev libtool lrzsz mkisofs msmtp nano ninja-build p7zip p7zip-full patch pkgconf python2.7 python3 python3-pyelftools python3-setuptools qemu-utils rsync scons squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd zlib1g-dev
+          sudo apt update -y
+          sudo apt install -y ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential \
+          bzip2 ccache clang cmake cpio curl device-tree-compiler flex gawk gcc-multilib g++-multilib \
+          gettext git gperf libtool libncurses5-dev libssl-dev libelf-dev make nano ncurses-dev \
+          openssl patch pkgconf python3 python3-pip python3-setuptools python3-wheel qemu-utils rsync \
+          scons squashfs-tools subversion swig texinfo uglifyjs unzip zlib1g-dev
 
-      # 4. 配置 feeds
-      - name: 配置 feeds
+      - name: Git 网络优化
         run: |
+          git config --global http.postBuffer 524288000
+          git config --global http.timeout 300
+
+      - name: 编译缓存
+        uses: actions/cache@v4.2.2
+        with:
+          path: |
+            .ccache
+            dl
+          key: ${{ runner.os }}-openwrt-bigmem-${{ hashFiles('**/.config') }}
+          restore-keys: |
+            ${{ runner.os }}-openwrt-bigmem-
+
+      - name: 添加全套稳定插件源
+        run: |
+          sed -i 's_downloads.openwrt.org_mirrors.ustc.edu.cn/openwrt_' feeds.conf.default
+          cat >> feeds.conf.default << 'EOF'
+          src-git lienol https://github.com/Lienol/openwrt-package
+          src-git lean https://github.com/coolsnowwolf/packages
+          src-git passwall https://github.com/xiaorouji/openwrt-passwall
+          src-git passwall2 https://github.com/xiaorouji/openwrt-passwall2
+          src-git openclash https://github.com/vernesong/OpenClash
+          src-git adguardhome https://github.com/rufengsuixing/luci-app-adguardhome
+          src-git dockerman https://github.com/lisaac/luci-app-dockerman
+          src-git nas https://github.com/linkease/nas-packages
+          src-git nas_luci https://github.com/linkease/nas-packages-luci
+          src-git theme https://github.com/rosywrt/luci-theme-rosy
+          src-git helloworld https://github.com/fw876/helloworld
+          src-git ddns https://github.com/linkease/ddnsto
+          src-git alist https://github.com/chenmozhijin/luci-app-alist
+          src-git filemanager https://github.com/immortalwrt/luci-app-filemanager
+          src-git pushbot https://github.com/zzsj0928/luci-app-pushbot
+          src-git clouddrive https://github.com/linkease/CloudDrive
+          src-git vnt https://github.com/lazygit/openwrt-vnt
+          src-git speedtest https://github.com/sirpdboy/luci-app-speedtest
+          src-git smartdns https://github.com/pymumu/openwrt-smartdns
+          src-git smartdns-luci https://github.com/pymumu/luci-app-smartdns
+          src-git guestnetwork https://github.com/sirpdboy/luci-app-guestwifi
+          src-git qbittorrent https://github.com/kingonion/luci-app-qbittorrent
+          src-git dnsfilter https://github.com/destan19/OpenAppFilter
+          src-git autoshutdown https://github.com/sirpdboy/luci-app-autopoweroff
+          src-git shortcut https://github.com/sirpdboy/luci-app-control-weburl
+          EOF
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
-      # 5. 加载自定义配置 (全家桶 + 手机备份)
-      - name: 加载自定义配置
+      - name: 大内存专属系统调优 + 进程限制 + ZRAM
         run: |
-          # 这里假设你在仓库根目录放了 .config 文件
-          # 如果你没有上传 .config 文件，这一步会复制默认配置
-          if [ -f .config ]; then
-            cp .config .config.old
-          else
-            # 如果没有配置文件，生成一个默认的 x86 配置
-            make defconfig
-          fi
+          cat >> package/base-files/files/etc/profile << 'EOF'
+          ulimit -m 2097152
+          ulimit -v 2097152
+          ulimit -n 65535
+          ulimit -u 8192
+          EOF
 
-          # --- 在这里注入全家桶和手机备份插件 ---
-          # 开启 LuCI 应用
-          echo "CONFIG_PACKAGE_luci=y" >> .config
-          # 开启 iStore 应用商店 (全家桶核心)
-          echo "CONFIG_PACKAGE_luci-app-istore=y" >> .config
-          # 开启 NPS 内网穿透 (手机备份核心)
-          echo "CONFIG_PACKAGE_luci-app-nps=y" >> .config
-          # 开启其他常用全家桶插件
-          echo "CONFIG_PACKAGE_luci-app-passwall=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-openclash=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-ssr-plus=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-upnp=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-samba4=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-ttyd=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-frpc=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-adguardhome=y" >> .config
+          cat >> package/base-files/files/etc/sysctl.conf << 'EOF'
+          vm.swappiness=40
+          vm.min_free_kbytes=131072
+          vm.overcommit_memory=0
+          vm.dirty_ratio=30
+          vm.dirty_background_ratio=15
+          vm.dirty_expire_centisecs=3000
+          vm.oom_kill_allocating_task=0
+          net.ipv4.tcp_tw_reuse=1
+          net.ipv4.tcp_syncookies=1
+          EOF
 
-          # 再次更新配置以解决依赖
+          cat >> package/base-files/files/etc/rc.local << 'EOF'
+          modprobe zram
+          echo lz4 > /sys/block/zram0/comp_algorithm
+          echo 1024M > /sys/block/zram0/disksize
+          mkswap /dev/zram0
+          swapon /dev/zram0
+          EOF
+
           make defconfig
 
-      # 6. 下载 dl 源码
-      - name: 下载 dl 源码
-        run: make download -j8
-
-      # 7. 开始编译
-      - name: 开始编译固件
+      - name: 启用ZRAM模块 + 编译优化
         run: |
-          make -j$(nproc)
+          echo "CONFIG_PACKAGE_zram-swap=y" >> .config
+          echo "CONFIG_PACKAGE_kmod-zram=y" >> .config
+          echo "CONFIG_TARGET_OPTIONS=y" >> .config
+          echo "CONFIG_TARGET_OPTIMIZATION=\"-O2\"" >> .config
+          make defconfig
 
-      # 8. 整理固件
-      - name: 整理固件
+      - name: 注入应用商店
         run: |
-          mkdir -p output
-          cp bin/targets/x86/64/*.* output/
+          echo "CONFIG_PACKAGE_luci-app-opkg=y" >> .config
+          echo "CONFIG_PACKAGE_opkg=y" >> .config
+          echo "CONFIG_PACKAGE_opkg-conf=y" >> .config
+          echo "CONFIG_PACKAGE_opkg-update=y" >> .config
+          echo "CONFIG_PACKAGE_curl=y" >> .config
+          echo "CONFIG_PACKAGE_wget=y" >> .config
+          echo "CONFIG_PACKAGE_luci-i18n-opkg-zh-cn=y" >> .config
+          sed -i 's/option check_signature\t1/option check_signature\t0/' package/base-files/files/etc/opkg.conf
+          make defconfig
 
-      # 9. 上传固件 (关键修复：v3 改为 v4)
+      - name: 加载自定义配置
+        run: |
+          cp ${{ github.event.inputs.CONFIG_FILE }} .config
+          make defconfig
+
+      - name: 下载依赖包
+        run: |
+          make download -j$(nproc)
+
+      - name: 编译固件
+        run: |
+          make -j$(nproc) V=s LDFLAGS="-O2" CFLAGS="-O2"
+
       - name: 上传固件
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.2.2
         with:
-          name: OpenWrt-x86-firmware
-          path: output/
+          name: OpenWrt-25.12.4-BigMem-x86_64
+          path: bin/targets/x86/64/
