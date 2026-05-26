@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       CONFIG_FILE:
-        description: '配置文件路径 (例如: configs/x86_64.config)'
+        description: '配置文件路径'
         required: true
         default: 'configs/x86_64.config'
 
@@ -12,23 +12,20 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      # 1. 检出代码（包含子模块）
       - name: 检出源码
         uses: actions/checkout@v4
         with:
           repository: Lienol/openwrt
           ref: 25.12
           fetch-depth: 0
-          path: openwrt  # 指定克隆路径，方便后续操作
+          path: openwrt
 
-      # 2. 进入工作目录并优化Git网络
       - name: 优化 Git 网络
-        working-directory: ./openwrt  # 必须在源码目录内执行
+        working-directory: ./openwrt
         run: |
           git config --global http.postBuffer 524288000
           git config --global http.version HTTP/1.1
 
-      # 3. 安装编译依赖
       - name: 安装编译依赖
         env:
           DEBIAN_FRONTEND: noninteractive
@@ -40,82 +37,64 @@ jobs:
           openssl patch pkgconf python3 python3-pip python3-setuptools python3-wheel qemu-utils rsync \
           scons squashfs-tools subversion swig texinfo uglifyjs unzip zlib1g-dev
 
-      # 4. 配置插件源
       - name: 添加全套稳定插件源
         working-directory: ./openwrt
         run: |
-          # 替换默认源为中科大源
-          sed -i 's_downloads.openwrt.org_mirrors.ustc.edu.cn/openwrt_' feeds.conf.default
-          
-          # 添加第三方插件源
-          cat >> feeds.conf.default <<EOF
-          src-git lean https://github.com/coolsnowwolf/packages
-          src-git passwall https://github.com/xiaorouji/openwrt-passwall
-          src-git passwall2 https://github.com/xiaorouji/openwrt-passwall2
-          src-git openclash https://github.com/vernesong/OpenClash
-          src-git adguardhome https://github.com/rufengsuixing/luci-app-adguardhome
-          src-git dockerman https://github.com/lisaac/luci-app-dockerman
-          src-git nas https://github.com/linkease/nas-packages
-          src-git nas_luci https://github.com/linkease/nas-packages-luci
-          src-git theme https://github.com/rosywrt/luci-theme-rosy
-          src-git helloworld https://github.com/fw876/helloworld
-          src-git ddns https://github.com/linkease/ddnsto
-          src-git alist https://github.com/chenmozhijin/luci-app-alist
-          src-git filemanager https://github.com/immortalwrt/luci-app-filemanager
-          src-git pushbot https://github.com/zzsj0928/luci-app-pushbot
-          src-git clouddrive https://github.com/linkease/CloudDrive
-          src-git vnt https://github.com/lazygit/openwrt-vnt
-          src-git speedtest https://github.com/sirpdboy/luci-app-speedtest
-          src-git smartdns https://github.com/pymumu/openwrt-smartdns
-          src-git smartdns-luci https://github.com/pymumu/luci-app-smartdns
-          src-git guestnetwork https://github.com/sirpdboy/luci-app-guestwifi
-          src-git qbittorrent https://github.com/kingonion/luci-app-qbittorrent
-          src-git dnsfilter https://github.com/destan19/OpenAppFilter
-          src-git autoshutdown https://github.com/sirpdboy/luci-app-autopoweroff
-          src-git shortcut https://github.com/sirpdboy/luci-app-control-weburl
-          EOF
-          
+          sed -i 's|https://downloads.openwrt.org|https://mirrors.ustc.edu.cn/openwrt|g' feeds.conf.default
+          echo "src-git lean https://github.com/coolsnowwolf/packages" >> feeds.conf.default
+          echo "src-git passwall https://github.com/xiaorouji/openwrt-passwall" >> feeds.conf.default
+          echo "src-git passwall2 https://github.com/xiaorouji/openwrt-passwall2" >> feeds.conf.default
+          echo "src-git openclash https://github.com/vernesong/OpenClash" >> feeds.conf.default
+          echo "src-git adguardhome https://github.com/rufengsuixing/luci-app-adguardhome" >> feeds.conf.default
+          echo "src-git dockerman https://github.com/lisaac/luci-app-dockerman" >> feeds.conf.default
+          echo "src-git nas https://github.com/linkease/nas-packages" >> feeds.conf.default
+          echo "src-git nas_luci https://github.com/linkease/nas-packages-luci" >> feeds.conf.default
+          echo "src-git theme https://github.com/rosywrt/luci-theme-rosy" >> feeds.conf.default
+          echo "src-git helloworld https://github.com/fw876/helloworld" >> feeds.conf.default
+          echo "src-git ddns https://github.com/linkease/ddnsto" >> feeds.conf.default
+          echo "src-git alist https://github.com/chenmozhijin/luci-app-alist" >> feeds.conf.default
+          echo "src-git filemanager https://github.com/immortalwrt/luci-app-filemanager" >> feeds.conf.default
+          echo "src-git pushbot https://github.com/zzsj0928/luci-app-pushbot" >> feeds.conf.default
+          echo "src-git clouddrive https://github.com/linkease/CloudDrive" >> feeds.conf.default
+          echo "src-git vnt https://github.com/lazygit/openwrt-vnt" >> feeds.conf.default
+          echo "src-git speedtest https://github.com/sirpdboy/luci-app-speedtest" >> feeds.conf.default
+          echo "src-git smartdns https://github.com/pymumu/openwrt-smartdns" >> feeds.conf.default
+          echo "src-git smartdns-luci https://github.com/pymumu/luci-app-smartdns" >> feeds.conf.default
+          echo "src-git guestnetwork https://github.com/sirpdboy/luci-app-guestwifi" >> feeds.conf.default
+          echo "src-git qbittorrent https://github.com/kingonion/luci-app-qbittorrent" >> feeds.conf.default
+          echo "src-git dnsfilter https://github.com/destan19/OpenAppFilter" >> feeds.conf.default
+          echo "src-git autoshutdown https://github.com/sirpdboy/luci-app-autopoweroff" >> feeds.conf.default
+          echo "src-git shortcut https://github.com/sirpdboy/luci-app-control-weburl" >> feeds.conf.default
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
-      # 5. 大内存专属系统调优 + ZRAM
       - name: 配置系统调优
         working-directory: ./openwrt
         run: |
-          # 修改系统资源限制
-          cat >> package/base-files/files/etc/profile << 'EOF'
-          ulimit -m 2097152
-          ulimit -v 2097152
-          ulimit -n 65535
-          ulimit -u 8192
-          EOF
+          echo "ulimit -m 2097152" >> package/base-files/files/etc/profile
+          echo "ulimit -v 2097152" >> package/base-files/files/etc/profile
+          echo "ulimit -n 65535" >> package/base-files/files/etc/profile
+          echo "ulimit -u 8192" >> package/base-files/files/etc/profile
 
-          # 修改内核参数
-          cat >> package/base-files/files/etc/sysctl.conf << 'EOF'
-          vm.swappiness=40
-          vm.min_free_kbytes=131072
-          vm.overcommit_memory=0
-          vm.dirty_ratio=30
-          vm.dirty_background_ratio=15
-          vm.dirty_expire_centisecs=3000
-          vm.oom_kill_allocating_task=0
-          net.ipv4.tcp_tw_reuse=1
-          net.ipv4.tcp_syncookies=1
-          EOF
+          echo "vm.swappiness=40" >> package/base-files/files/etc/sysctl.conf
+          echo "vm.min_free_kbytes=131072" >> package/base-files/files/etc/sysctl.conf
+          echo "vm.overcommit_memory=0" >> package/base-files/files/etc/sysctl.conf
+          echo "vm.dirty_ratio=30" >> package/base-files/files/etc/sysctl.conf
+          echo "vm.dirty_background_ratio=15" >> package/base-files/files/etc/sysctl.conf
+          echo "vm.dirty_expire_centisecs=3000" >> package/base-files/files/etc/sysctl.conf
+          echo "vm.oom_kill_allocating_task=0" >> package/base-files/files/etc/sysctl.conf
+          echo "net.ipv4.tcp_tw_reuse=1" >> package/base-files/files/etc/sysctl.conf
+          echo "net.ipv4.tcp_syncookies=1" >> package/base-files/files/etc/sysctl.conf
 
-          # 添加ZRAM开机脚本
-          cat >> package/base-files/files/etc/rc.local << 'EOF'
-          modprobe zram
-          echo lz4 > /sys/block/zram0/comp_algorithm
-          echo 1024M > /sys/block/zram0/disksize
-          mkswap /dev/zram0
-          swapon /dev/zram0
-          exit 0
-          EOF
+          echo "modprobe zram" >> package/base-files/files/etc/rc.local
+          echo "echo lz4 > /sys/block/zram0/comp_algorithm" >> package/base-files/files/etc/rc.local
+          echo "echo 1024M > /sys/block/zram0/disksize" >> package/base-files/files/etc/rc.local
+          echo "mkswap /dev/zram0" >> package/base-files/files/etc/rc.local
+          echo "swapon /dev/zram0" >> package/base-files/files/etc/rc.local
+          echo "exit 0" >> package/base-files/files/etc/rc.local
 
           make defconfig
 
-      # 6. 启用ZRAM模块 + 编译优化
       - name: 启用ZRAM与编译优化
         working-directory: ./openwrt
         run: |
@@ -125,7 +104,6 @@ jobs:
           echo "CONFIG_TARGET_OPTIMIZATION=\"-O2\"" >> .config
           make defconfig
 
-      # 7. 注入应用商店
       - name: 注入应用商店
         working-directory: ./openwrt
         run: |
@@ -139,11 +117,9 @@ jobs:
           sed -i 's/option check_signature\t1/option check_signature\t0/' package/base-files/files/etc/opkg.conf
           make defconfig
 
-      # 8. 加载自定义配置
       - name: 加载自定义配置
         working-directory: ./openwrt
         run: |
-          # 检查配置文件是否存在
           if [ ! -f "${{ github.event.inputs.CONFIG_FILE }}" ]; then
             echo "错误：找不到配置文件 ${{ github.event.inputs.CONFIG_FILE }}"
             exit 1
@@ -151,21 +127,17 @@ jobs:
           cp ${{ github.event.inputs.CONFIG_FILE }} .config
           make defconfig
 
-      # 9. 下载依赖包
       - name: 下载依赖包
         working-directory: ./openwrt
         run: |
           make download -j$(nproc)
-          # 清理下载失败的包（可选）
           find dl -size -1024c -delete
 
-      # 10. 编译固件
       - name: 编译固件
         working-directory: ./openwrt
         run: |
           make -j$(nproc) V=s LDFLAGS="-O2" CFLAGS="-O2"
 
-      # 11. 上传固件
       - name: 上传固件
         uses: actions/upload-artifact@v4
         with:
