@@ -1,99 +1,83 @@
-name: 编译 x86_64 固件
+name: Build x86_64 with Store
 
 on:
   workflow_dispatch:
-  # 取消下面两行的注释，可以定时自动编译（每3天一次）
-  # schedule:
-  #   - cron: '0 20 */3 * *'
-
-env:
-  REPO_URL: https://github.com/1986537311/openwrt.git
-  REPO_BRANCH: 25.12
-  TZ: Asia/Shanghai
 
 jobs:
   build:
     runs-on: ubuntu-22.04
 
     steps:
-    - name: 检出仓库
-      uses: actions/checkout@v4
+      # 1. 清理磁盘空间
+      - name: Free Disk Space
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: false
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          swap-storage: true
 
-    - name: 🧹 清理磁盘空间
-      run: |
-        sudo rm -rf /opt/hostedtoolcache /usr/share/dotnet /usr/local/lib/android /usr/local/share/boost
-        sudo apt-get autoremove -y >/dev/null
-        sudo apt-get clean
-        df -h
+      # 2. 检出代码
+      - name: Checkout
+        uses: actions/checkout@v3
 
-    - name: 📦 安装编译依赖
-      run: |
-        sudo apt-get update -qq
-        sudo apt-get install -y \
-          build-essential clang flex gawk gcc-multilib g++-multilib \
-          gettext git libncurses5-dev libssl-dev python3 python3-distutils \
-          rsync swig unzip wget xsltproc zlib1g-dev ccache ecj
+      # 3. 安装基础依赖
+      - name: Initialization Environment
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc
+          sudo -E apt-get -qq update
+          sudo -E apt-get -qq install ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential bzip2 ccache cmake cpio curl device-tree-compiler fastjar flex gawk gettext gcc-multilib g++-multilib git gnutls-dev gperf haveged help2man intltool libc6-dev-i386 libelf-dev libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev libncurses-dev libpython3-dev libreadline-dev libssl-dev libtool lrzsz mkisofs msmtp ninja-build p7zip p7zip-full patch pkgconf python2.7 python3 python3-pip libpython3-dev qemu-utils rsync scons squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd zlib1g-dev
 
-    - name: 📥 克隆源码
-      run: |
-        git clone -b $REPO_BRANCH --single-branch $REPO_URL openwrt
-        ln -sf openwrt/* .
-        ls openwrt
+      # 4. 加载缓存 (加速编译)
+      - name: Cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            .config
+            dl
+            staging_dir
+            build_dir
+          key: ${{ runner.os }}-openwrt-${{ hashFiles('.config') }}
 
-    - name: ➕ 添加 Lienol 扩展源
-      run: |
-        cd openwrt
-        echo "src-git lienol https://github.com/Lienol/openwrt-package.git" >> feeds.conf.default
+      # 5. 【关键步骤】配置编译选项并加入商店插件
+      - name: Configure Build
+        run: |
+          # 下载 feeds
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+          
+          # 生成默认配置
+          # 如果你的仓库根目录有 .config 文件，这一步会读取它
+          # 如果没有，它会生成一个默认的最小配置
+          make defconfig
+          
+          # 【核心命令】向配置文件追加内容
+          # 选择 x86_64 架构
+          echo "CONFIG_TARGET_x86=y" >> .config
+          echo "CONFIG_TARGET_x86_64=y" >> .config
+          echo "CONFIG_TARGET_x86_64_DEVICE_generic=y" >> .config
+          
+          # 开启 LuCI 界面
+          echo "CONFIG_PACKAGE_luci=y" >> .config
+          
+          # 【重点】加入软件商店 (luci-app-store)
+          echo "CONFIG_PACKAGE_luci-app-store=y" >> .config
+          
+          # 显示最终配置
+          cat .config
 
-    - name: 🔄 更新 & 安装 Feeds
-      run: |
-        cd openwrt
-        ./scripts/feeds update -a
-        ./scripts/feeds install -a
-
-    - name: ⚙️ 写入 x86_64 配置
-      run: |
-        cd openwrt
-        cat > .config << 'EOF'
-        CONFIG_TARGET_x86=y
-        CONFIG_TARGET_x86_64=y
-        CONFIG_TARGET_x86_64_generic=y
-        CONFIG_DEVEL=y
-        CONFIG_CCACHE=y
-        CONFIG_GRUB_IMAGES=y
-        CONFIG_EFI_IMAGES=y
-        CONFIG_VMDK_IMAGES=y
-        CONFIG_LUCI_LANG_zh_Hans=y
-        CONFIG_PACKAGE_luci=y
-        CONFIG_PACKAGE_luci-app-firewall=y
-        CONFIG_PACKAGE_luci-app-opkg=y
-        CONFIG_PACKAGE_luci-app-ttyd=y
-        CONFIG_PACKAGE_luci-app-upnp=y
-        CONFIG_PACKAGE_luci-app-wol=y
-        CONFIG_PACKAGE_luci-app-passwall=y
-        CONFIG_PACKAGE_luci-app-openclash=y
-        CONFIG_PACKAGE_luci-app-adguardhome=y
-        CONFIG_PACKAGE_wget-ssl=y
-        CONFIG_PACKAGE_curl=y
-        CONFIG_PACKAGE_htop=y
-        CONFIG_PACKAGE_ip-full=y
-        EOF
-        make defconfig
-
-    - name: 📦 预下载
-      run: |
-        cd openwrt
-        make download -j8
-
-    - name: 🔨 开始编译
-      run: |
-        cd openwrt
-        make -j$(nproc) V=s 2>&1 | tee build.log
-
-    - name: 📤 上传固件
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: openwrt-x86_64-firmware
-        path: openwrt/bin/targets/x86/64/*
-
+      # 6. 开始编译
+      - name: Build Firmware
+        run: |
+          make -j$(nproc)
+          
+      # 7. 上传固件
+      - name: Upload Firmware
+        uses: actions/upload-artifact@v3
+        with:
+          name: OpenWrt-x86-64-Firmware
+          path: bin/targets/x86/64/
