@@ -1,4 +1,4 @@
-name: Build x86_64 with Store
+name: Build x86 Firmware
 
 on:
   workflow_dispatch:
@@ -9,7 +9,7 @@ jobs:
 
     steps:
       # 1. 清理磁盘空间
-      - name: Free Disk Space
+      - name: Free disk space
         uses: jlumbroso/free-disk-space@main
         with:
           tool-cache: false
@@ -20,64 +20,71 @@ jobs:
           swap-storage: true
 
       # 2. 检出代码
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@v3
 
-      # 3. 安装基础依赖
-      - name: Initialization Environment
+      # 3. 初始化环境
+      - name: Init environment
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
           sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc
           sudo -E apt-get -qq update
-          sudo -E apt-get -qq install ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential bzip2 ccache cmake cpio curl device-tree-compiler fastjar flex gawk gettext gcc-multilib g++-multilib git gnutls-dev gperf haveged help2man intltool libc6-dev-i386 libelf-dev libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev libncurses-dev libpython3-dev libreadline-dev libssl-dev libtool lrzsz mkisofs msmtp ninja-build p7zip p7zip-full patch pkgconf python2.7 python3 python3-pip libpython3-dev qemu-utils rsync scons squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd zlib1g-dev
+          sudo -E apt-get -qq install ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential bzip2 ccache cmake cpio curl device-tree-compiler fastjar flex gawk gcc-multilib g++-multilib gettext git gperf haveged help2man intltool libc6-dev-i386 libelf-dev libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev libncurses5-dev libncursesw5-dev libreadline-dev libssl-dev libtool lrzsz mkisofs msmtp nano ninja-build p7zip p7zip-full patch pkgconf python2.7 python3 python3-pyelftools python3-setuptools qemu-utils rsync scons squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd zlib1g-dev
 
-      # 4. 加载缓存 (加速编译)
-      - name: Cache
-        uses: actions/cache@v3
-        with:
-          path: |
-            .config
-            dl
-            staging_dir
-            build_dir
-          key: ${{ runner.os }}-openwrt-${{ hashFiles('.config') }}
-
-      # 5. 【关键步骤】配置编译选项并加入商店插件
-      - name: Configure Build
+      # 4. 配置 Feeds 源
+      - name: Configure feeds
         run: |
-          # 下载 feeds
+          echo "src-git packages https://github.com/openwrt/packages.git;openwrt-23.05" > feeds.conf
+          echo "src-git luci https://github.com/openwrt/luci.git;openwrt-23.05" >> feeds.conf
+          echo "src-git routing https://github.com/openwrt/routing.git;openwrt-23.05" >> feeds.conf
+          echo "src-git telephony https://github.com/openwrt/telephony.git;openwrt-23.05" >> feeds.conf
+          # 添加 Lienol 商店源
+          echo "src-git lienol https://github.com/Lienol/openwrt-package.git" >> feeds.conf
+
+      # 5. 更新并安装 Feeds
+      - name: Install feeds
+        run: |
           ./scripts/feeds update -a
           ./scripts/feeds install -a
-          
-          # 生成默认配置
-          # 如果你的仓库根目录有 .config 文件，这一步会读取它
-          # 如果没有，它会生成一个默认的最小配置
-          make defconfig
-          
-          # 【核心命令】向配置文件追加内容
-          # 选择 x86_64 架构
-          echo "CONFIG_TARGET_x86=y" >> .config
-          echo "CONFIG_TARGET_x86_64=y" >> .config
-          echo "CONFIG_TARGET_x86_64_DEVICE_generic=y" >> .config
-          
-          # 开启 LuCI 界面
-          echo "CONFIG_PACKAGE_luci=y" >> .config
-          
-          # 【重点】加入软件商店 (luci-app-store)
-          echo "CONFIG_PACKAGE_luci-app-store=y" >> .config
-          
-          # 显示最终配置
-          cat .config
+          # 单独确保安装商店插件
+          ./scripts/feeds install luci-app-store
 
-      # 6. 开始编译
-      - name: Build Firmware
+      # 6. 写入配置文件
+      - name: Write config file
         run: |
-          make -j$(nproc)
-          
-      # 7. 上传固件
-      - name: Upload Firmware
-        uses: actions/upload-artifact@v3
+          cat > .config <<EOF
+          CONFIG_TARGET_x86=y
+          CONFIG_TARGET_x86_64=y
+          CONFIG_TARGET_PROFILE=DEVICE_generic
+          CONFIG_PACKAGE_luci-app-store=y
+          CONFIG_PACKAGE_luci-i18n-store-zh-cn=y
+          CONFIG_PACKAGE_ipset=y
+          CONFIG_PACKAGE_iptables=y
+          CONFIG_PACKAGE_kmod-nfnetlink=y
+          CONFIG_PACKAGE_kmod-ipt-nat=y
+          CONFIG_PACKAGE_kmod-tun=y
+          CONFIG_PACKAGE_wget=y
+          CONFIG_PACKAGE_curl=y
+          CONFIG_PACKAGE_htop=y
+          CONFIG_PACKAGE_bash=y
+          CONFIG_PACKAGE_vim-full=y
+          CONFIG_DEVEL=y
+          CONFIG_CCACHE=y
+          EOF
+
+      # 7. 编译固件
+      - name: Compile firmware
+        id: compile
+        run: |
+          make -j$(nproc) download
+          make -j$(nproc) || exit 1
+          mkdir -p output
+          cp bin/targets/x86/64/* output/
+
+      # 8. 上传固件
+      - name: Upload firmware
+        uses: actions/upload-artifact@v4
         with:
-          name: OpenWrt-x86-64-Firmware
-          path: bin/targets/x86/64/
+          name: OpenWrt-x86-firmware
+          path: output/
