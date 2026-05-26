@@ -47,7 +47,6 @@ jobs:
 
       - name: 添加全套稳定插件源
         run: |
-          sed -i 's_downloads.openwrt.org_mirrors.ustc.edu.cn/openwrt_' feeds.conf.default
           echo "src-git lean https://github.com/coolsnowwolf/packages" >> feeds.conf.default
           echo "src-git passwall https://github.com/xiaorouji/openwrt-passwall" >> feeds.conf.default
           echo "src-git passwall2 https://github.com/xiaorouji/openwrt-passwall2" >> feeds.conf.default
