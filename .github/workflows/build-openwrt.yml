@@ -1,4 +1,4 @@
-name: OpenWrt 23.05.6 x86 一键编译（带兼容插件版）
+name: OpenWrt 23.05.6 x86 一键编译（修复small源版）
 on:
   workflow_dispatch:
 
@@ -7,37 +7,42 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 360
     steps:
-      # 1. 拉取官方 23.05 源码（和你仓库分支完全无关）
+      # 1. 强制拉取官方 23.05 源码（和你仓库分支无关）
       - name: 拉取官方源码
         run: |
           git clone --depth 1 --branch openwrt-23.05 https://github.com/openwrt/openwrt.git
           cd openwrt
 
-      # 2. 安装编译依赖
+      # 2. 安装依赖（官方标准依赖，无额外问题）
       - name: 安装依赖包
         working-directory: ./openwrt
         run: |
           sudo apt update -y
           sudo apt install -y build-essential gcc g++ make cmake autoconf automake libtool pkg-config libncurses5-dev libssl-dev libxml2-dev libreadline-dev git wget curl unzip bzip2 xz-utils zlib1g-dev python3 python3-pip perl rsync subversion
 
-      # 3. 配置 Feeds（官方源 + 兼容版small + iStore）
+      # 3. 配置 Feeds（修复small源，加重试）
       - name: 配置插件源
         working-directory: ./openwrt
         run: |
           rm -rf feeds/*
           cat > feeds.conf << EOF
+          # 官方基础源（必须用23.05分支，不炸）
           src-git packages https://git.openwrt.org/feed/packages.git;openwrt-23.05
           src-git luci https://git.openwrt.org/feed/luci.git;openwrt-23.05
           src-git routing https://git.openwrt.org/feed/routing.git;openwrt-23.05
           src-git telephony https://git.openwrt.org/feed/telephony.git;openwrt-23.05
-          # 用兼容23.05的固定提交，避免报错
-          src-git small https://github.com/kenzok8/small.git;b6d48b7
+          # kenzok8 small 核心源（换用master分支，避免固定提交失效）
+          src-git small https://github.com/kenzok8/small.git
+          # kenzok8 补充插件源（最新版，补主题/工具）
+          src-git small-pkgs https://github.com/kenzok8/openwrt-packages.git
+          # iStore 应用商店
           src-git istore https://github.com/linkease/istore.git
           EOF
-          ./scripts/feeds update -a
-          ./scripts/feeds install -a
+          # 加重试机制，拉取失败自动重试
+          ./scripts/feeds update -a || ./scripts/feeds update -a
+          ./scripts/feeds install -a || ./scripts/feeds install -a
 
-      # 4. 配置系统与插件（基础功能 + OpenClash + iStore）
+      # 4. 配置系统与插件（基础功能 + OpenClash + Docker + iStore）
       - name: 配置系统功能
         working-directory: ./openwrt
         run: |
@@ -48,11 +53,12 @@ jobs:
           echo "CONFIG_LUCI_LANG_zh-cn=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-opkg=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-openclash=y" >> .config
+          echo "CONFIG_PACKAGE_luci-theme-argon=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-store=y" >> .config
           echo "CONFIG_PACKAGE_docker=y" >> .config
           make defconfig
 
-      # 5. 替换清华源（修复路径问题）
+      # 5. 替换清华源（修复路径问题，用sed直接修改）
       - name: 替换为清华镜像源
         working-directory: ./openwrt
         run: |
@@ -72,5 +78,5 @@ jobs:
       - name: 上传固件包
         uses: actions/upload-artifact@v4
         with:
-          name: OpenWrt-23.05.6-x86-插件版
+          name: OpenWrt-23.05.6-x86-全能版
           path: ./openwrt/bin/targets/x86/64/
