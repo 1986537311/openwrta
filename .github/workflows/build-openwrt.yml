@@ -27,7 +27,7 @@ jobs:
           sudo apt install -y ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential \
           bzip2 ccache clang cmake cpio curl device-tree-compiler flex gawk gcc-multilib g++-multilib \
           gettext git gperf libtool libncurses5-dev libssl-dev libelf-dev make nano ncurses-dev \
-          openssl patch pkgconf python3 python3-pip python3-setuptools python3-wheel qemu-utils rsync \
+          openssl patch pkgconf python3 python3-dev python3-pip python3-setuptools python3-wheel qemu-utils rsync \
           scons squashfs-tools subversion swig texinfo uglifyjs unzip zlib1g-dev
 
       - name: Git 网络优化
@@ -45,8 +45,18 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-openwrt-bigmem-
 
-      - name: 添加全套稳定插件源
+      - name: 配置软件源及 Feeds
         run: |
+          # 备份原始 feeds.conf.default
+          cp feeds.conf.default feeds.conf.default.bak
+          
+          # 清空原内容，只保留基础源（根据你的需求调整）
+          echo "src-git packages https://github.com/openwrt/packages" > feeds.conf.default
+          echo "src-git luci https://github.com/openwrt/luci" >> feeds.conf.default
+          echo "src-git routing https://github.com/openwrt/routing" >> feeds.conf.default
+          echo "src-git telephony https://github.com/openwrt/telephony" >> feeds.conf.default
+          
+          # 添加自定义插件源 (使用中科大镜像加速)
           echo "src-git lean https://github.com/coolsnowwolf/packages" >> feeds.conf.default
           echo "src-git passwall https://github.com/xiaorouji/openwrt-passwall" >> feeds.conf.default
           echo "src-git passwall2 https://github.com/xiaorouji/openwrt-passwall2" >> feeds.conf.default
@@ -71,19 +81,31 @@ jobs:
           echo "src-git dnsfilter https://github.com/destan19/OpenAppFilter" >> feeds.conf.default
           echo "src-git autoshutdown https://github.com/sirpdboy/luci-app-autopoweroff" >> feeds.conf.default
           echo "src-git shortcut https://github.com/sirpdboy/luci-app-control-weburl" >> feeds.conf.default
-          ./scripts/feeds update -a
-          ./scripts/feeds install -a
+
+      - name: 更新 Feeds (含重试机制)
+        run: |
+          for i in {1..3}; do
+            ./scripts/feeds update -a && break || sleep 10;
+          done
+          for i in {1..3}; do
+            ./scripts/feeds install -a && break || sleep 10;
+          done
 
       - name: 大内存专属系统调优 + 进程限制 + ZRAM
         run: |
+          # 写入 /etc/profile 限制内存和文件描述符
           cat >> package/base-files/files/etc/profile << 'EOF'
+
+          # 大内存优化：限制单进程虚拟内存 2GB，物理内存 2GB，文件描述符 65535
           ulimit -m 2097152
           ulimit -v 2097152
           ulimit -n 65535
           ulimit -u 8192
           EOF
 
+          # 写入 /etc/sysctl.conf 内核参数优化
           cat >> package/base-files/files/etc/sysctl.conf << 'EOF'
+          # ZRAM 和 内存回收策略优化
           vm.swappiness=40
           vm.min_free_kbytes=131072
           vm.overcommit_memory=0
@@ -95,12 +117,18 @@ jobs:
           net.ipv4.tcp_syncookies=1
           EOF
 
+          # 写入 /etc/rc.local 开机脚本 (加载 ZRAM)
           cat >> package/base-files/files/etc/rc.local << 'EOF'
-          modprobe zram
-          echo lz4 > /sys/block/zram0/comp_algorithm
-          echo 1024M > /sys/block/zram0/disksize
-          mkswap /dev/zram0
-          swapon /dev/zram0
+
+          # 加载 ZRAM 模块并启用
+          if ! modprobe zram; then
+              echo "Failed to load zram module"
+          else
+              echo lz4 > /sys/block/zram0/comp_algorithm 2>/dev/null || true
+              echo 1024M > /sys/block/zram0/disksize 2>/dev/null || true
+              mkswap /dev/zram0 2>/dev/null || true
+              swapon /dev/zram0 2>/dev/null || true
+          fi
           EOF
 
           make defconfig
