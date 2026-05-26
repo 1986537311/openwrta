@@ -1,17 +1,13 @@
-name: 编译 OpenWrt 大内存版
+name: 编译 OpenWrt 大内存版（无配置文件版）
 
 on:
-  workflow_dispatch:
-    inputs:
-      CONFIG_FILE:
-        description: '配置文件路径'
-        required: true
-        default: 'configs/x86_64.config'
+  workflow_dispatch
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      # 1. 检出源码
       - name: 检出源码
         uses: actions/checkout@v4
         with:
@@ -20,12 +16,14 @@ jobs:
           fetch-depth: 0
           path: openwrt
 
+      # 2. 优化Git网络
       - name: 优化 Git 网络
         working-directory: ./openwrt
         run: |
           git config --global http.postBuffer 524288000
           git config --global http.version HTTP/1.1
 
+      # 3. 安装依赖
       - name: 安装编译依赖
         env:
           DEBIAN_FRONTEND: noninteractive
@@ -37,6 +35,7 @@ jobs:
           openssl patch pkgconf python3 python3-pip python3-setuptools python3-wheel qemu-utils rsync \
           scons squashfs-tools subversion swig texinfo uglifyjs unzip zlib1g-dev
 
+      # 4. 添加插件源（无红波浪、无解析错误）
       - name: 添加全套稳定插件源
         working-directory: ./openwrt
         run: |
@@ -68,6 +67,7 @@ jobs:
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
+      # 5. 系统调优（无 here-doc，无红波浪）
       - name: 配置系统调优
         working-directory: ./openwrt
         run: |
@@ -95,6 +95,7 @@ jobs:
 
           make defconfig
 
+      # 6. 启用ZRAM模块 + 编译优化
       - name: 启用ZRAM与编译优化
         working-directory: ./openwrt
         run: |
@@ -104,6 +105,7 @@ jobs:
           echo "CONFIG_TARGET_OPTIMIZATION=\"-O2\"" >> .config
           make defconfig
 
+      # 7. 注入应用商店
       - name: 注入应用商店
         working-directory: ./openwrt
         run: |
@@ -117,27 +119,20 @@ jobs:
           sed -i 's/option check_signature\t1/option check_signature\t0/' package/base-files/files/etc/opkg.conf
           make defconfig
 
-      - name: 加载自定义配置
-        working-directory: ./openwrt
-        run: |
-          if [ ! -f "${{ github.event.inputs.CONFIG_FILE }}" ]; then
-            echo "错误：找不到配置文件 ${{ github.event.inputs.CONFIG_FILE }}"
-            exit 1
-          fi
-          cp ${{ github.event.inputs.CONFIG_FILE }} .config
-          make defconfig
-
+      # 8. 下载依赖包
       - name: 下载依赖包
         working-directory: ./openwrt
         run: |
           make download -j$(nproc)
           find dl -size -1024c -delete
 
+      # 9. 编译固件
       - name: 编译固件
         working-directory: ./openwrt
         run: |
           make -j$(nproc) V=s LDFLAGS="-O2" CFLAGS="-O2"
 
+      # 10. 上传固件
       - name: 上传固件
         uses: actions/upload-artifact@v4
         with:
