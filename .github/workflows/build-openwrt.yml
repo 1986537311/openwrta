@@ -30,72 +30,64 @@ jobs:
         run: |
           sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc
           sudo -E apt-get -qq update
-          # 这里修复了 lrzsk -> lrzsz，并增加了常用依赖
-          sudo -E apt-get -qq install ack antlr3 aria2 asciidoc autoconf automake autopoint binutils bison build-essential bzip2 ccache cmake cpio curl device-tree-compiler fastjar flex gawk gettext gcc-multilib g++-multilib git gperf haveged help2man intltool libc6-dev-i386 libelf-dev libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev libncurses5-dev libncursesw5-dev libpython3-dev libreadline-dev libssl-dev libtool lrzsz mkisofs msmtp nano ninja-build p7zip p7zip-full patch pkgconf python2.7 python3 python3-pyelftools python3-setuptools qemu-utils rsync scons squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd zlib1g-dev
+          sudo -E apt-get -qq install ack antlr3 aria2 asciidoc autoconf automake autopoint binutils bison build-essential bzip2 ccache cmake cpio curl device-tree-compiler fastjar flex gawk gettext gcc-multilib g++-multilib git gperf haveged help2man intltool libc6-dev-i386 libelf-dev libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev libncurses5-dev libncursesw5-dev libreadline-dev libssl-dev libtool lrzsz mkisofs msmtp nano ninja-build p7zip p7zip-full patch pkgconf python2.7 python3 python3-pyelftools python3-setuptools qemu-utils rsync scons squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd zlib1g-dev
 
-      # 4. 配置文件源 (包含商店)
-      - name: 配置软件源
-        run: |
-          echo "src-git packages https://github.com/openwrt/packages.git;openwrt-23.05" >> feeds.conf.default
-          echo "src-git luci https://github.com/openwrt/luci.git;openwrt-23.05" >> feeds.conf.default
-          echo "src-git routing https://github.com/openwrt/routing.git;openwrt-23.05" >> feeds.conf.default
-          echo "src-git telephony https://github.com/openwrt/telephony.git;openwrt-23.05" >> feeds.conf.default
-          # 添加 iStore 商店源
-          echo "src-git store https://github.com/istore/istore" >> feeds.conf.default
-
-      # 5. 更新并安装基础源
-      - name: 安装基础软件源
+      # 4. 配置 feeds
+      - name: 配置 feeds
         run: |
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
-      # 6. 自定义配置 (全家桶 + 手机备份)
-      - name: 写入配置文件
+      # 5. 加载自定义配置 (全家桶 + 手机备份)
+      - name: 加载自定义配置
         run: |
-          # 加载默认配置
-          cp -f /dev/null .config
-          echo "CONFIG_TARGET_x86=y" >> .config
-          echo "CONFIG_TARGET_x86_64=y" >> .config
-          echo "CONFIG_DEVEL=y" >> .config
-          echo "CONFIG_CCACHE=y" >> .config
+          # 这里假设你在仓库根目录放了 .config 文件
+          # 如果你没有上传 .config 文件，这一步会复制默认配置
+          if [ -f .config ]; then
+            cp .config .config.old
+          else
+            # 如果没有配置文件，生成一个默认的 x86 配置
+            make defconfig
+          fi
 
-          # --- 核心全家桶插件 ---
-          # 网络加速
-          echo "CONFIG_PACKAGE_luci-app-passwall=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-ssr-plus=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-openclash=y" >> .config
-          # 广告过滤
-          echo "CONFIG_PACKAGE_luci-app-adguardhome=y" >> .config
-          # 内网穿透 (手机备份神器)
-          echo "CONFIG_PACKAGE_luci-app-nps=y" >> .config
-          # 网络存储
-          echo "CONFIG_PACKAGE_luci-app-samba4=y" >> .config
-          # 系统管理
-          echo "CONFIG_PACKAGE_luci-app-turboacc=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-unbound=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-ddns=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-wol=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-ramfree=y" >> .config
-          # 常用工具
-          echo "CONFIG_PACKAGE_luci-app-fileassistant=y" >> .config
-
-          # --- iStore 商店 ---
-          # 更新商店源并安装
-          ./scripts/feeds update store
-          ./scripts/feeds install -a -p store
+          # --- 在这里注入全家桶和手机备份插件 ---
+          # 开启 LuCI 应用
+          echo "CONFIG_PACKAGE_luci=y" >> .config
+          # 开启 iStore 应用商店 (全家桶核心)
           echo "CONFIG_PACKAGE_luci-app-istore=y" >> .config
+          # 开启 NPS 内网穿透 (手机备份核心)
+          echo "CONFIG_PACKAGE_luci-app-nps=y" >> .config
+          # 开启其他常用全家桶插件
+          echo "CONFIG_PACKAGE_luci-app-passwall=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-openclash=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-ssr-plus=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-upnp=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-samba4=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-ttyd=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-frpc=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-adguardhome=y" >> .config
 
-          # 预下载配置
+          # 再次更新配置以解决依赖
           make defconfig
 
+      # 6. 下载 dl 源码
+      - name: 下载 dl 源码
+        run: make download -j8
+
       # 7. 开始编译
-      - name: 编译固件
+      - name: 开始编译固件
         run: |
           make -j$(nproc)
 
-      # 8. 上传固件
+      # 8. 整理固件
+      - name: 整理固件
+        run: |
+          mkdir -p output
+          cp bin/targets/x86/64/*.* output/
+
+      # 9. 上传固件 (关键修复：v3 改为 v4)
       - name: 上传固件
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: OpenWrt-x86-64-Firmware
-          path: bin/targets/x86/64/
+          name: OpenWrt-x86-firmware
+          path: output/
