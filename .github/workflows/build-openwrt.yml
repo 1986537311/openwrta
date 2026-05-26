@@ -1,4 +1,4 @@
-name: OpenWrt v25.12.4 官方稳定版 + 全插件源
+name: OpenWrt v25.12.4 官方稳定版 + 全插件源（修复版）
 
 on:
   workflow_dispatch:
@@ -39,10 +39,10 @@ jobs:
           path: |
             openwrt/dl
             openwrt/build_dir
-          key: openwrt-25.12.4-stable-full-${{ github.sha }}
+          key: openwrt-25.12.4-stable-${{ github.sha }}
           restore-keys: openwrt-25.12.4-stable-
 
-      - name: 配置 Feeds（官方+全部稳定插件源）
+      - name: 配置 Feeds（官方+稳定插件源，删除冲突的small源）
         working-directory: ./openwrt
         run: |
           cp feeds.conf.default feeds.conf.default.bak
@@ -52,7 +52,6 @@ jobs:
           echo "src-git routing https://git.openwrt.org/feed/routing.git;openwrt-25.12" >> feeds.conf.default
           echo "src-git telephony https://git.openwrt.org/feed/telephony.git;openwrt-25.12" >> feeds.conf.default
           echo "src-git kenzok8 https://github.com/kenzok8/openwrt-packages.git;master" >> feeds.conf.default
-          echo "src-git kenzok8_small https://github.com/kenzok8/small.git;master" >> feeds.conf.default
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
@@ -96,5 +95,5 @@ jobs:
       - name: 上传成品固件
         uses: actions/upload-artifact@v4
         with:
-          name: OpenWrt-v25.12.4-全稳定插件源
+          name: OpenWrt-v25.12.4-稳定版
           path: openwrt/bin/targets/x86/64/
