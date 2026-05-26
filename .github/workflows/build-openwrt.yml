@@ -31,7 +31,7 @@ jobs:
           key: openwrt-23.05.6-official-full-${{ github.sha }}
           restore-keys: openwrt-23.05.6-official-full-
 
-      - name: 配置 feeds（官方全源 + kenzok8+small 23.05 稳定分支）
+      - name: 配置 feeds（官方全源 + kenzok8+small master 分支）
         working-directory: ./openwrt
         run: |
           cp feeds.conf.default feeds.conf
@@ -41,9 +41,9 @@ jobs:
           echo "src-git luci https://git.openwrt.org/feed/luci.git;openwrt-23.05" >> feeds.conf
           echo "src-git routing https://git.openwrt.org/feed/routing.git;openwrt-23.05" >> feeds.conf
           echo "src-git telephony https://git.openwrt.org/feed/telephony.git;openwrt-23.05" >> feeds.conf
-          # 最稳第三方（只留 kenzok8+small，锁定 23.05）
-          echo "src-git kenzok8 https://github.com/kenzok8/openwrt-packages.git;23.05" >> feeds.conf
-          echo "src-git small https://github.com/kenzok8/small.git;23.05" >> feeds.conf
+          # 改用 master 分支（23.05 分支已废弃）
+          echo "src-git kenzok8 https://github.com/kenzok8/openwrt-packages.git;master" >> feeds.conf
+          echo "src-git small https://github.com/kenzok8/small.git;master" >> feeds.conf
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
