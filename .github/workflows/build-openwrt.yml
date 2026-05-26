@@ -1,4 +1,4 @@
-name: OpenWrt v25.12.4 官方稳定版 + 全插件源（修复版）
+name: OpenWrt 23.05.6 官方全源+稳定第三方全家桶
 
 on:
   workflow_dispatch:
@@ -10,14 +10,7 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 360
     steps:
-      - name: 配置 Git 全局环境
-        run: |
-          git config --global advice.detachedHead false
-          git config --global http.postBuffer 524288000
-          git config --global http.lowSpeedLimit 0
-          git config --global http.lowSpeedTime 999999
-
-      - name: 检出基础环境
+      - name: 检出代码
         uses: actions/checkout@v4
 
       - name: 安装编译依赖
@@ -25,42 +18,36 @@ jobs:
           sudo apt update -y
           sudo apt install -y build-essential gcc g++ make cmake autoconf automake libtool pkg-config libncurses5-dev libssl-dev libxml2-dev libreadline-dev git wget curl unzip bzip2 xz-utils zlib1g-dev python3 python3-pip perl rsync subversion
 
-      - name: 拉取官方 v25.12.4 稳定版源码
+      - name: 拉取 OpenWrt 23.05.6 官方稳定版
         run: |
-          mkdir openwrt && cd openwrt
-          git init
-          git remote add origin https://git.openwrt.org/openwrt/openwrt.git
-          git fetch --depth=1 origin v25.12.4
-          git checkout FETCH_HEAD
+          git clone --depth=1 --branch=v23.05.6 https://git.openwrt.org/openwrt/openwrt.git openwrt
 
-      - name: 缓存编译文件 提速防超时
+      - name: 缓存 dl + build_dir（防超时、提速）
         uses: actions/cache@v4
         with:
           path: |
             openwrt/dl
             openwrt/build_dir
-          key: openwrt-25.12.4-stable-${{ github.sha }}
-          restore-keys: openwrt-25.12.4-stable-
+          key: openwrt-23.05.6-official-full-${{ github.sha }}
+          restore-keys: openwrt-23.05.6-official-full-
 
-      - name: 配置 Feeds（官方+稳定插件源，删除冲突的small源）
+      - name: 配置 feeds（官方全源 + kenzok8+small 23.05 稳定分支）
         working-directory: ./openwrt
         run: |
-          cp feeds.conf.default feeds.conf.default.bak
-          > feeds.conf.default
-          echo "src-git packages https://git.openwrt.org/feed/packages.git;openwrt-25.12" >> feeds.conf.default
-          echo "src-git luci https://git.openwrt.org/feed/luci.git;openwrt-25.12" >> feeds.conf.default
-          echo "src-git routing https://git.openwrt.org/feed/routing.git;openwrt-25.12" >> feeds.conf.default
-          echo "src-git telephony https://git.openwrt.org/feed/telephony.git;openwrt-25.12" >> feeds.conf.default
-          echo "src-git kenzok8 https://github.com/kenzok8/openwrt-packages.git;master" >> feeds.conf.default
+          cp feeds.conf.default feeds.conf
+          > feeds.conf
+          # 官方全部稳定源（23.05 分支）
+          echo "src-git packages https://git.openwrt.org/feed/packages.git;openwrt-23.05" >> feeds.conf
+          echo "src-git luci https://git.openwrt.org/feed/luci.git;openwrt-23.05" >> feeds.conf
+          echo "src-git routing https://git.openwrt.org/feed/routing.git;openwrt-23.05" >> feeds.conf
+          echo "src-git telephony https://git.openwrt.org/feed/telephony.git;openwrt-23.05" >> feeds.conf
+          # 最稳第三方（只留 kenzok8+small，锁定 23.05）
+          echo "src-git kenzok8 https://github.com/kenzok8/openwrt-packages.git;23.05" >> feeds.conf
+          echo "src-git small https://github.com/kenzok8/small.git;23.05" >> feeds.conf
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
-      - name: 初始化基础配置
-        working-directory: ./openwrt
-        run: |
-          make defconfig
-
-      - name: 配置系统 中文+商店+x86_64
+      - name: 基础配置 x86_64 + 中文 + 常用插件
         working-directory: ./openwrt
         run: |
           echo "CONFIG_TARGET_x86=y" >> .config
@@ -69,20 +56,36 @@ jobs:
           echo "CONFIG_LUCI=y" >> .config
           echo "CONFIG_LUCI_LANG_zh-cn=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-opkg=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-openclash=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-passwall=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-ssr-plus=y" >> .config
+          echo "CONFIG_PACKAGE_luci-theme-argon=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-diskman=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-adbyby=y" >> .config
+          echo "CONFIG_PACKAGE_docker=y" >> .config
+          echo "CONFIG_PACKAGE_docker-compose=y" >> .config
           make defconfig
 
-      - name: 预置国内清华稳定镜像源（纯echo写法，零红波浪）
+      - name: opkg 国内镜像（清华 + 官方双写，最稳）
         working-directory: ./openwrt
         run: |
-          rm -f package/base-files/files/etc/apk/repositories.d/distfeeds.list
-          echo "https://mirrors.tuna.tsinghua.edu.cn/openwrt/releases/25.12.4/targets/x86/64/packages" >> package/base-files/files/etc/apk/repositories.d/distfeeds.list
-          echo "https://mirrors.tuna.tsinghua.edu.cn/openwrt/releases/25.12.4/packages/x86_64/base" >> package/base-files/files/etc/apk/repositories.d/distfeeds.list
-          echo "https://mirrors.tuna.tsinghua.edu.cn/openwrt/releases/25.12.4/packages/x86_64/luci" >> package/base-files/files/etc/apk/repositories.d/distfeeds.list
-          echo "https://mirrors.tuna.tsinghua.edu.cn/openwrt/releases/25.12.4/packages/x86_64/packages" >> package/base-files/files/etc/apk/repositories.d/distfeeds.list
-          echo "https://mirrors.tuna.tsinghua.edu.cn/openwrt/releases/25.12.4/packages/x86_64/routing" >> package/base-files/files/etc/apk/repositories.d/distfeeds.list
-          echo "https://mirrors.tuna.tsinghua.edu.cn/openwrt/releases/25.12.4/packages/x86_64/telephony" >> package/base-files/files/etc/apk/repositories.d/distfeeds.list
+          rm -f package/base-files/files/etc/opkg/distfeeds.conf
+          # 清华镜像（优先）
+          echo "src/gz openwrt_core https://mirrors.tuna.tsinghua.edu.cn/openwrt/releases/23.05.6/targets/x86/64/packages" >> package/base-files/files/etc/opkg/distfeeds.conf
+          echo "src/gz openwrt_base https://mirrors.tuna.tsinghua.edu.cn/openwrt/releases/23.05.6/packages/x86_64/base" >> package/base-files/files/etc/opkg/distfeeds.conf
+          echo "src/gz openwrt_luci https://mirrors.tuna.tsinghua.edu.cn/openwrt/releases/23.05.6/packages/x86_64/luci" >> package/base-files/files/etc/opkg/distfeeds.conf
+          echo "src/gz openwrt_packages https://mirrors.tuna.tsinghua.edu.cn/openwrt/releases/23.05.6/packages/x86_64/packages" >> package/base-files/files/etc/opkg/distfeeds.conf
+          echo "src/gz openwrt_routing https://mirrors.tuna.tsinghua.edu.cn/openwrt/releases/23.05.6/packages/x86_64/routing" >> package/base-files/files/etc/opkg/distfeeds.conf
+          echo "src/gz openwrt_telephony https://mirrors.tuna.tsinghua.edu.cn/openwrt/releases/23.05.6/packages/x86_64/telephony" >> package/base-files/files/etc/opkg/distfeeds.conf
+          # 官方源（备用，防镜像挂）
+          echo "src/gz openwrt_core_offical https://downloads.openwrt.org/releases/23.05.6/targets/x86/64/packages" >> package/base-files/files/etc/opkg/distfeeds.conf
+          echo "src/gz openwrt_base_offical https://downloads.openwrt.org/releases/23.05.6/packages/x86_64/base" >> package/base-files/files/etc/opkg/distfeeds.conf
+          echo "src/gz openwrt_luci_offical https://downloads.openwrt.org/releases/23.05.6/packages/x86_64/luci" >> package/base-files/files/etc/opkg/distfeeds.conf
+          echo "src/gz openwrt_packages_offical https://downloads.openwrt.org/releases/23.05.6/packages/x86_64/packages" >> package/base-files/files/etc/opkg/distfeeds.conf
+          echo "src/gz openwrt_routing_offical https://downloads.openwrt.org/releases/23.05.6/packages/x86_64/routing" >> package/base-files/files/etc/opkg/distfeeds.conf
+          echo "src/gz openwrt_telephony_offical https://downloads.openwrt.org/releases/23.05.6/packages/x86_64/telephony" >> package/base-files/files/etc/opkg/distfeeds.conf
 
-      - name: 预下载依赖包
+      - name: 预下载所有依赖
         working-directory: ./openwrt
         run: |
           make download -j$(nproc)
@@ -92,8 +95,8 @@ jobs:
         run: |
           make -j$(nproc) V=s
 
-      - name: 上传成品固件
+      - name: 上传成品
         uses: actions/upload-artifact@v4
         with:
-          name: OpenWrt-v25.12.4-稳定版
+          name: OpenWrt-23.05.6-x86_64-官方全源+稳定第三方
           path: openwrt/bin/targets/x86/64/
