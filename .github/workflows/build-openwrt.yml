@@ -1,139 +1,112 @@
-name: 编译 OpenWrt 大内存版（最终修复版）
+name: OpenWrt v25.12.4 官方稳定版 + 全插件源
 
 on:
-  workflow_dispatch
+  workflow_dispatch:
+  push:
+    branches: [ main ]
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
+    timeout-minutes: 360
     steps:
-      # 1. 检出源码
-      - name: 检出源码
-        uses: actions/checkout@v4
-        with:
-          repository: Lienol/openwrt
-          ref: 25.12
-          fetch-depth: 0
-          path: openwrt
-
-      # 2. 优化Git网络
-      - name: 优化 Git 网络
-        working-directory: ./openwrt
+      - name: 配置 Git 全局环境
         run: |
+          git config --global advice.detachedHead false
           git config --global http.postBuffer 524288000
-          git config --global http.version HTTP/1.1
+          git config --global http.lowSpeedLimit 0
+          git config --global http.lowSpeedTime 999999
 
-      # 3. 安装依赖
+      - name: 检出基础环境
+        uses: actions/checkout@v4
+
       - name: 安装编译依赖
-        env:
-          DEBIAN_FRONTEND: noninteractive
         run: |
           sudo apt update -y
-          sudo apt install -y ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential \
-          bzip2 ccache clang cmake cpio curl device-tree-compiler flex gawk gcc-multilib g++-multilib \
-          gettext git gperf libtool libncurses5-dev libssl-dev libelf-dev make nano ncurses-dev \
-          openssl patch pkgconf python3 python3-pip python3-setuptools python3-wheel qemu-utils rsync \
-          scons squashfs-tools subversion swig texinfo uglifyjs unzip zlib1g-dev
+          sudo apt install -y build-essential gcc g++ make cmake autoconf automake libtool pkg-config libncurses5-dev libssl-dev libxml2-dev libreadline-dev git wget curl unzip bzip2 xz-utils zlib1g-dev python3 python3-pip perl rsync subversion
 
-      # 4. 添加插件源（关键：删掉了破坏文件的sed命令）
-      - name: 添加全套稳定插件源
+      - name: 拉取官方 v25.12.4 稳定版源码
+        run: |
+          mkdir openwrt && cd openwrt
+          git init
+          git remote add origin https://git.openwrt.org/openwrt/openwrt.git
+          git fetch --depth=1 origin v25.12.4
+          git checkout FETCH_HEAD
+
+      - name: 缓存编译文件 提速防超时
+        uses: actions/cache@v4
+        with:
+          path: |
+            openwrt/dl
+            openwrt/build_dir
+          key: openwrt-25.12.4-stable-full-${{ github.sha }}
+          restore-keys: openwrt-25.12.4-stable-
+
+      - name: 配置 Feeds（官方+全部稳定插件源）
         working-directory: ./openwrt
         run: |
-          echo "src-git lean https://github.com/coolsnowwolf/packages" >> feeds.conf.default
-          echo "src-git passwall https://github.com/xiaorouji/openwrt-passwall" >> feeds.conf.default
-          echo "src-git passwall2 https://github.com/xiaorouji/openwrt-passwall2" >> feeds.conf.default
-          echo "src-git openclash https://github.com/vernesong/OpenClash" >> feeds.conf.default
-          echo "src-git adguardhome https://github.com/rufengsuixing/luci-app-adguardhome" >> feeds.conf.default
-          echo "src-git dockerman https://github.com/lisaac/luci-app-dockerman" >> feeds.conf.default
-          echo "src-git nas https://github.com/linkease/nas-packages" >> feeds.conf.default
-          echo "src-git nas_luci https://github.com/linkease/nas-packages-luci" >> feeds.conf.default
-          echo "src-git theme https://github.com/rosywrt/luci-theme-rosy" >> feeds.conf.default
-          echo "src-git helloworld https://github.com/fw876/helloworld" >> feeds.conf.default
-          echo "src-git ddns https://github.com/linkease/ddnsto" >> feeds.conf.default
-          echo "src-git alist https://github.com/chenmozhijin/luci-app-alist" >> feeds.conf.default
-          echo "src-git filemanager https://github.com/immortalwrt/luci-app-filemanager" >> feeds.conf.default
-          echo "src-git pushbot https://github.com/zzsj0928/luci-app-pushbot" >> feeds.conf.default
-          echo "src-git clouddrive https://github.com/linkease/CloudDrive" >> feeds.conf.default
-          echo "src-git vnt https://github.com/lazygit/openwrt-vnt" >> feeds.conf.default
-          echo "src-git speedtest https://github.com/sirpdboy/luci-app-speedtest" >> feeds.conf.default
-          echo "src-git smartdns https://github.com/pymumu/openwrt-smartdns" >> feeds.conf.default
-          echo "src-git smartdns-luci https://github.com/pymumu/luci-app-smartdns" >> feeds.conf.default
-          echo "src-git guestnetwork https://github.com/sirpdboy/luci-app-guestwifi" >> feeds.conf.default
-          echo "src-git qbittorrent https://github.com/kingonion/luci-app-qbittorrent" >> feeds.conf.default
-          echo "src-git dnsfilter https://github.com/destan19/OpenAppFilter" >> feeds.conf.default
-          echo "src-git autoshutdown https://github.com/sirpdboy/luci-app-autopoweroff" >> feeds.conf.default
-          echo "src-git shortcut https://github.com/sirpdboy/luci-app-control-weburl" >> feeds.conf.default
+          # 备份默认源
+          cp feeds.conf.default feeds.conf.default.bak
+          
+          # 清空并重新写入官方源（指定 openwrt-25.12 分支）
+          > feeds.conf.default
+          echo "src-git packages https://git.openwrt.org/feed/packages.git;openwrt-25.12" >> feeds.conf.default
+          echo "src-git luci https://git.openwrt.org/feed/luci.git;openwrt-25.12" >> feeds.conf.default
+          echo "src-git routing https://git.openwrt.org/feed/routing.git;openwrt-25.12" >> feeds.conf.default
+          echo "src-git telephony https://git.openwrt.org/feed/telephony.git;openwrt-25.12" >> feeds.conf.default
+          
+          # 添加第三方插件源
+          echo "src-git kenzok8 https://github.com/kenzok8/openwrt-packages.git;master" >> feeds.conf.default
+          echo "src-git kenzok8_small https://github.com/kenzok8/small.git;master" >> feeds.conf.default
+          
+          # 更新并安装 Feeds
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
-      # 5. 系统调优
-      - name: 配置系统调优
+      - name: 初始化基础配置
         working-directory: ./openwrt
         run: |
-          echo "ulimit -m 2097152" >> package/base-files/files/etc/profile
-          echo "ulimit -v 2097152" >> package/base-files/files/etc/profile
-          echo "ulimit -n 65535" >> package/base-files/files/etc/profile
-          echo "ulimit -u 8192" >> package/base-files/files/etc/profile
-
-          echo "vm.swappiness=40" >> package/base-files/files/etc/sysctl.conf
-          echo "vm.min_free_kbytes=131072" >> package/base-files/files/etc/sysctl.conf
-          echo "vm.overcommit_memory=0" >> package/base-files/files/etc/sysctl.conf
-          echo "vm.dirty_ratio=30" >> package/base-files/files/etc/sysctl.conf
-          echo "vm.dirty_background_ratio=15" >> package/base-files/files/etc/sysctl.conf
-          echo "vm.dirty_expire_centisecs=3000" >> package/base-files/files/etc/sysctl.conf
-          echo "vm.oom_kill_allocating_task=0" >> package/base-files/files/etc/sysctl.conf
-          echo "net.ipv4.tcp_tw_reuse=1" >> package/base-files/files/etc/sysctl.conf
-          echo "net.ipv4.tcp_syncookies=1" >> package/base-files/files/etc/sysctl.conf
-
-          echo "modprobe zram" >> package/base-files/files/etc/rc.local
-          echo "echo lz4 > /sys/block/zram0/comp_algorithm" >> package/base-files/files/etc/rc.local
-          echo "echo 1024M > /sys/block/zram0/disksize" >> package/base-files/files/etc/rc.local
-          echo "mkswap /dev/zram0" >> package/base-files/files/etc/rc.local
-          echo "swapon /dev/zram0" >> package/base-files/files/etc/rc.local
-          echo "exit 0" >> package/base-files/files/etc/rc.local
-
           make defconfig
 
-      # 6. 启用ZRAM模块 + 编译优化
-      - name: 启用ZRAM与编译优化
+      - name: 配置系统 中文+商店+x86_64
         working-directory: ./openwrt
         run: |
-          echo "CONFIG_PACKAGE_zram-swap=y" >> .config
-          echo "CONFIG_PACKAGE_kmod-zram=y" >> .config
-          echo "CONFIG_TARGET_OPTIONS=y" >> .config
-          echo "CONFIG_TARGET_OPTIMIZATION=\"-O2\"" >> .config
-          make defconfig
-
-      # 7. 注入应用商店
-      - name: 注入应用商店
-        working-directory: ./openwrt
-        run: |
+          echo "CONFIG_TARGET_x86=y" >> .config
+          echo "CONFIG_TARGET_x86_64=y" >> .config
+          echo "CONFIG_TARGET_x86_64_DEVICE_generic=y" >> .config
+          echo "CONFIG_LUCI=y" >> .config
+          echo "CONFIG_LUCI_LANG_zh-cn=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-opkg=y" >> .config
-          echo "CONFIG_PACKAGE_opkg=y" >> .config
-          echo "CONFIG_PACKAGE_opkg-conf=y" >> .config
-          echo "CONFIG_PACKAGE_opkg-update=y" >> .config
-          echo "CONFIG_PACKAGE_curl=y" >> .config
-          echo "CONFIG_PACKAGE_wget=y" >> .config
-          echo "CONFIG_PACKAGE_luci-i18n-opkg-zh-cn=y" >> .config
-          sed -i 's/option check_signature\t1/option check_signature\t0/' package/base-files/files/etc/opkg.conf
           make defconfig
 
-      # 8. 下载依赖包
-      - name: 下载依赖包
+      - name: 预置国内清华稳定镜像源
+        working-directory: ./openwrt
+        run: |
+          # 移除默认的 distfeeds.conf（如果存在）
+          rm -f package/base-files/files/etc/opkg/distfeeds.conf
+          
+          # 直接写入清华源配置
+          cat > package/base-files/files/etc/opkg/distfeeds.conf << 'EOF'
+          src/gz openwrt_core https://mirrors.tuna.tsinghua.edu.cn/openwrt/releases/25.12.4/targets/x86/64/packages
+          src/gz openwrt_base https://mirrors.tuna.tsinghua.edu.cn/openwrt/releases/25.12.4/packages/x86_64/base
+          src/gz openwrt_luci https://mirrors.tuna.tsinghua.edu.cn/openwrt/releases/25.12.4/packages/x86_64/luci
+          src/gz openwrt_packages https://mirrors.tuna.tsinghua.edu.cn/openwrt/releases/25.12.4/packages/x86_64/packages
+          src/gz openwrt_routing https://mirrors.tuna.tsinghua.edu.cn/openwrt/releases/25.12.4/packages/x86_64/routing
+          src/gz openwrt_telephony https://mirrors.tuna.tsinghua.edu.cn/openwrt/releases/25.12.4/packages/x86_64/telephony
+          EOF
+
+      - name: 预下载依赖包
         working-directory: ./openwrt
         run: |
           make download -j$(nproc)
-          find dl -size -1024c -delete
 
-      # 9. 编译固件
       - name: 编译固件
         working-directory: ./openwrt
         run: |
-          make -j$(nproc) V=s LDFLAGS="-O2" CFLAGS="-O2"
+          make -j$(nproc) V=s
 
-      # 10. 上传固件
-      - name: 上传固件
+      - name: 上传成品固件
         uses: actions/upload-artifact@v4
         with:
-          name: OpenWrt-25.12.4-BigMem-x86_64
-          path: ./openwrt/bin/targets/x86/64/
+          name: OpenWrt-v25.12.4-全稳定插件源
+          path: openwrt/bin/targets/x86/64/
