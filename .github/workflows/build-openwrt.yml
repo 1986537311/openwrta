@@ -1,4 +1,4 @@
-name: 编译 OpenWrt 大内存版（无配置文件版）
+name: 编译 OpenWrt 大内存版（最终修复版）
 
 on:
   workflow_dispatch
@@ -35,11 +35,10 @@ jobs:
           openssl patch pkgconf python3 python3-pip python3-setuptools python3-wheel qemu-utils rsync \
           scons squashfs-tools subversion swig texinfo uglifyjs unzip zlib1g-dev
 
-      # 4. 添加插件源（无红波浪、无解析错误）
+      # 4. 添加插件源（关键：删掉了破坏文件的sed命令）
       - name: 添加全套稳定插件源
         working-directory: ./openwrt
         run: |
-          sed -i 's|https://downloads.openwrt.org|https://mirrors.ustc.edu.cn/openwrt|g' feeds.conf.default
           echo "src-git lean https://github.com/coolsnowwolf/packages" >> feeds.conf.default
           echo "src-git passwall https://github.com/xiaorouji/openwrt-passwall" >> feeds.conf.default
           echo "src-git passwall2 https://github.com/xiaorouji/openwrt-passwall2" >> feeds.conf.default
@@ -67,7 +66,7 @@ jobs:
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
-      # 5. 系统调优（无 here-doc，无红波浪）
+      # 5. 系统调优
       - name: 配置系统调优
         working-directory: ./openwrt
         run: |
