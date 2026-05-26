@@ -49,7 +49,6 @@ jobs:
         run: |
           sed -i 's_downloads.openwrt.org_mirrors.ustc.edu.cn/openwrt_' feeds.conf.default
           cat >> feeds.conf.default << 'EOF'
-          src-git lienol https://github.com/Lienol/openwrt-package
           src-git lean https://github.com/coolsnowwolf/packages
           src-git passwall https://github.com/xiaorouji/openwrt-passwall
           src-git passwall2 https://github.com/xiaorouji/openwrt-passwall2
