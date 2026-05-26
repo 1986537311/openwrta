@@ -48,32 +48,30 @@ jobs:
       - name: 添加全套稳定插件源
         run: |
           sed -i 's_downloads.openwrt.org_mirrors.ustc.edu.cn/openwrt_' feeds.conf.default
-          cat >> feeds.conf.default << 'EOF'
-          src-git lean https://github.com/coolsnowwolf/packages
-          src-git passwall https://github.com/xiaorouji/openwrt-passwall
-          src-git passwall2 https://github.com/xiaorouji/openwrt-passwall2
-          src-git openclash https://github.com/vernesong/OpenClash
-          src-git adguardhome https://github.com/rufengsuixing/luci-app-adguardhome
-          src-git dockerman https://github.com/lisaac/luci-app-dockerman
-          src-git nas https://github.com/linkease/nas-packages
-          src-git nas_luci https://github.com/linkease/nas-packages-luci
-          src-git theme https://github.com/rosywrt/luci-theme-rosy
-          src-git helloworld https://github.com/fw876/helloworld
-          src-git ddns https://github.com/linkease/ddnsto
-          src-git alist https://github.com/chenmozhijin/luci-app-alist
-          src-git filemanager https://github.com/immortalwrt/luci-app-filemanager
-          src-git pushbot https://github.com/zzsj0928/luci-app-pushbot
-          src-git clouddrive https://github.com/linkease/CloudDrive
-          src-git vnt https://github.com/lazygit/openwrt-vnt
-          src-git speedtest https://github.com/sirpdboy/luci-app-speedtest
-          src-git smartdns https://github.com/pymumu/openwrt-smartdns
-          src-git smartdns-luci https://github.com/pymumu/luci-app-smartdns
-          src-git guestnetwork https://github.com/sirpdboy/luci-app-guestwifi
-          src-git qbittorrent https://github.com/kingonion/luci-app-qbittorrent
-          src-git dnsfilter https://github.com/destan19/OpenAppFilter
-          src-git autoshutdown https://github.com/sirpdboy/luci-app-autopoweroff
-          src-git shortcut https://github.com/sirpdboy/luci-app-control-weburl
-          EOF
+          echo "src-git lean https://github.com/coolsnowwolf/packages" >> feeds.conf.default
+          echo "src-git passwall https://github.com/xiaorouji/openwrt-passwall" >> feeds.conf.default
+          echo "src-git passwall2 https://github.com/xiaorouji/openwrt-passwall2" >> feeds.conf.default
+          echo "src-git openclash https://github.com/vernesong/OpenClash" >> feeds.conf.default
+          echo "src-git adguardhome https://github.com/rufengsuixing/luci-app-adguardhome" >> feeds.conf.default
+          echo "src-git dockerman https://github.com/lisaac/luci-app-dockerman" >> feeds.conf.default
+          echo "src-git nas https://github.com/linkease/nas-packages" >> feeds.conf.default
+          echo "src-git nas_luci https://github.com/linkease/nas-packages-luci" >> feeds.conf.default
+          echo "src-git theme https://github.com/rosywrt/luci-theme-rosy" >> feeds.conf.default
+          echo "src-git helloworld https://github.com/fw876/helloworld" >> feeds.conf.default
+          echo "src-git ddns https://github.com/linkease/ddnsto" >> feeds.conf.default
+          echo "src-git alist https://github.com/chenmozhijin/luci-app-alist" >> feeds.conf.default
+          echo "src-git filemanager https://github.com/immortalwrt/luci-app-filemanager" >> feeds.conf.default
+          echo "src-git pushbot https://github.com/zzsj0928/luci-app-pushbot" >> feeds.conf.default
+          echo "src-git clouddrive https://github.com/linkease/CloudDrive" >> feeds.conf.default
+          echo "src-git vnt https://github.com/lazygit/openwrt-vnt" >> feeds.conf.default
+          echo "src-git speedtest https://github.com/sirpdboy/luci-app-speedtest" >> feeds.conf.default
+          echo "src-git smartdns https://github.com/pymumu/openwrt-smartdns" >> feeds.conf.default
+          echo "src-git smartdns-luci https://github.com/pymumu/luci-app-smartdns" >> feeds.conf.default
+          echo "src-git guestnetwork https://github.com/sirpdboy/luci-app-guestwifi" >> feeds.conf.default
+          echo "src-git qbittorrent https://github.com/kingonion/luci-app-qbittorrent" >> feeds.conf.default
+          echo "src-git dnsfilter https://github.com/destan19/OpenAppFilter" >> feeds.conf.default
+          echo "src-git autoshutdown https://github.com/sirpdboy/luci-app-autopoweroff" >> feeds.conf.default
+          echo "src-git shortcut https://github.com/sirpdboy/luci-app-control-weburl" >> feeds.conf.default
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
